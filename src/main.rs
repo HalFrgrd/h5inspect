@@ -27,7 +27,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // create app and run it
     let mut app = App::new();
-    let res = run_app(&mut terminal, &mut app);
+    let _ = run_app(&mut terminal, &mut app);
 
     // restore terminal
     disable_raw_mode()?;
@@ -38,14 +38,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     )?;
     terminal.show_cursor()?;
 
-    if let Ok(do_print) = res {
-        if do_print {
-            app.print_json()?;
-        }
-    } else if let Err(err) = res {
-        println!("{err:?}");
-    }
-
     Ok(())
 }
 
@@ -53,11 +45,15 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> io::Result<
     loop {
         terminal.draw(|f| ui(f, app))?;
 
-        if let Event::Key(key) = event::read()? {
-            if key.kind == event::KeyEventKind::Release {
-                // Skip events that are not KeyEventKind::Press
-                continue;
-            }
+        if let Ok(true) = handle_events(app) {
+            return Ok(true);
+        }
+    }
+}
+
+fn handle_events(app: &mut App) -> io::Result<bool> {
+    if let Event::Key(key) = event::read()? {
+        if key.kind == event::KeyEventKind::Press {
             match app.current_screen {
                 CurrentScreen::Main => match key.code {
                     KeyCode::Char('e') => {
@@ -70,13 +66,7 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> io::Result<
                     _ => {}
                 },
                 CurrentScreen::Exiting => match key.code {
-                    KeyCode::Char('y') => {
-                        return Ok(true);
-                    }
-                    KeyCode::Char('n') | KeyCode::Char('q') => {
-                        return Ok(false);
-                    }
-                    _ => {}
+                    _ => {return Ok(true);}
                 },
                 CurrentScreen::Editing if key.kind == KeyEventKind::Press => {
                     match key.code {
@@ -131,4 +121,5 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> io::Result<
             }
         }
     }
+    return Ok(false);
 }
