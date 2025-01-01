@@ -35,7 +35,10 @@ pub fn generate_dummy_file() -> Result<()> {
     }
 
     let group1 = file.create_group("group1")?;
-    let group1_d1 = group1.new_dataset::<i32>().shape((ny, nx)).create("something")?;
+    let group1_d1 = group1
+        .new_dataset::<i32>()
+        .shape((ny, nx))
+        .create("something")?;
     group1_d1.write(&arr)?;
 
     Ok(())
