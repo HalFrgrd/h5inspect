@@ -28,7 +28,16 @@ pub fn ui(frame: &mut Frame, app: &mut App) {
     let items: Vec<TreeItem<'_, String>> = vec![
         TreeItem::new_leaf("leaf_1_id".to_string(), "leaf_1".to_string()),
         TreeItem::new_leaf("leaf_2_id".to_string(), "leaf_2".to_string()),
-        TreeItem::new_leaf("leaf_3_id".to_string(), "leaf_3".to_string()),
+        TreeItem::new(
+            "asd_id".to_string(),
+            "asd".to_string(),
+            [
+                TreeItem::new_leaf("leaf_3_id".to_string(), "leaf_3".to_string()),
+                TreeItem::new_leaf("leaf_4_id".to_string(), "leaf_4".to_string()),
+            ]
+            .to_vec(),
+        )
+        .unwrap(),
     ];
 
     let tree_widget = Tree::new(&items)

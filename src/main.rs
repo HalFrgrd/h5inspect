@@ -1,5 +1,6 @@
 use std::{error::Error, io};
 
+use crossterm::event::{MouseButton, MouseEventKind};
 use ratatui::{
     backend::{Backend, CrosstermBackend},
     crossterm::{
@@ -49,16 +50,23 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> io::Result<
     }
 }
 
-fn handle_events(_: &mut App) -> io::Result<bool> {
-    if let Event::Key(key) = event::read()? {
-        if key.kind == event::KeyEventKind::Press {
-            match key.code {
-                KeyCode::Char('q') => {
-                    return Ok(true);
+fn handle_events(app: &mut App) -> io::Result<bool> {
+    match event::read()? {
+        Event::Key(key) => {
+            if key.kind == event::KeyEventKind::Press {
+                match key.code {
+                    KeyCode::Char('q') => {
+                        return Ok(true);
+                    }
+                    _ => {}
                 }
-                _ => {}
             }
         }
+        Event::Mouse(mouse) => match mouse.kind {
+            MouseEventKind::Down(MouseButton::Left) => app.on_click(mouse.column, mouse.row),
+            _ => {}
+        },
+        _ => {}
     }
     return Ok(false);
 }
