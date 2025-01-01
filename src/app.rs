@@ -1,16 +1,13 @@
-use ratatui::layout::Position;
-use tui_tree_widget::{TreeItem, TreeState};
-use crossterm::event::{MouseButton, MouseEventKind};
-use std::io;
-
 use crate::ui::ui;
+use crossterm::event::{MouseButton, MouseEventKind};
+use ratatui::layout::Position;
 use ratatui::{
-    backend::{Backend, CrosstermBackend}, crossterm::{
-        event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
-        execute,
-        terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
-    }, DefaultTerminal, Terminal
+    backend::Backend,
+    crossterm::event::{self, Event, KeyCode},
+    DefaultTerminal,
 };
+use std::io;
+use tui_tree_widget::{TreeItem, TreeState};
 
 pub struct App {
     pub file_name: String,
@@ -74,17 +71,16 @@ impl App {
         return;
     }
 
-
     pub fn run(mut self, mut terminal: DefaultTerminal) -> io::Result<bool> {
         loop {
             terminal.draw(|f| ui(f, &mut self))?;
-    
+
             if let Ok(true) = self.handle_events() {
                 return Ok(true);
             }
         }
     }
-    
+
     fn handle_events(&mut self) -> io::Result<bool> {
         match event::read()? {
             Event::Key(key) => {
@@ -107,6 +103,4 @@ impl App {
         }
         return Ok(false);
     }
-    
-
 }

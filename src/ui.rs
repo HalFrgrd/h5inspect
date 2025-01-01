@@ -1,3 +1,4 @@
+use crate::app::App;
 use ratatui::{
     layout::{Constraint, Layout},
     style::{Color, Style},
@@ -5,8 +6,6 @@ use ratatui::{
     Frame,
 };
 use tui_tree_widget::Tree;
-
-use crate::app::App;
 
 pub fn ui(frame: &mut Frame, app: &mut App) {
     let chunks =
