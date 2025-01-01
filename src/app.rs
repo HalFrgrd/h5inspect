@@ -7,58 +7,80 @@ use ratatui::{
 };
 use std::io;
 use std::path::PathBuf;
-use tui_tree_widget::{TreeItem, TreeState};
+use tui_tree_widget::{Tree, TreeItem, TreeState};
 
-pub struct App {
+pub struct App<'a> {
     pub h5_file_path: PathBuf,
     pub tree_state: TreeState<String>,
-    pub tree_items: Vec<TreeItem<'static, String>>,
+    pub tree_items: Vec<TreeItem<'a, String>>,
 }
 
-impl App {
-    pub fn new(h5_file_path: PathBuf) -> App {
-        let items = vec![
-            TreeItem::new_leaf("leaf_1_id".to_string(), "leaf_1".to_string()),
-            TreeItem::new_leaf("leaf_2_id".to_string(), "leaf_2".to_string()),
-            TreeItem::new(
-                "asd_id".to_string(),
-                "asd".to_string(),
-                [
-                    TreeItem::new_leaf("leaf_3_id".to_string(), "leaf_3".to_string()),
-                    TreeItem::new_leaf("leaf_4_id".to_string(), "leaf_4".to_string()),
-                ]
-                .to_vec(),
-            )
-            .unwrap(),
-            TreeItem::new(
-                "no_child_id".to_string(),
-                "no children".to_string(),
-                Vec::new(),
-            )
-            .unwrap(),
-        ];
+impl<'a> App<'a> {
+    pub fn new(h5_file_path: PathBuf) -> App<'a> {
+        // let items = vec![
+        //     TreeItem::new_leaf("leaf_1_id".to_string(), "leaf_1".to_string()),
+        //     TreeItem::new_leaf("leaf_2_id".to_string(), "leaf_2".to_string()),
+        //     TreeItem::new(
+        //         "asd_id".to_string(),
+        //         "asd".to_string(),
+        //         [
+        //             TreeItem::new_leaf("leaf_3_id".to_string(), "leaf_3".to_string()),
+        //             TreeItem::new_leaf("leaf_4_id".to_string(), "leaf_4".to_string()),
+        //         ]
+        //         .to_vec(),
+        //     )
+        //     .unwrap(),
+        //     TreeItem::new(
+        //         "no_child_id".to_string(),
+        //         "no children".to_string(),
+        //         Vec::new(),
+        //     )
+        //     .unwrap(),
+        // ];
 
-        let app = App {
+        let mut app = App {
             h5_file_path,
             tree_state: TreeState::default(),
-            tree_items: items,
+            tree_items: vec![],
         };
-        let _ = app.tree_from_h5();
+        app.tree_items = app.tree_from_h5().unwrap();
         app
     }
 
-    fn tree_from_group(group: hdf5::Group) {
-        dbg!(group);
+    fn tree_from_group(group: hdf5::Group) -> Result<Vec<TreeItem<'a, String>>, std::io::Error> {
+        let mut result = Vec::new();
+
+        // println!("Found group={group:?}");
+        for child in group.groups().unwrap_or(vec![]) {
+            result.push(TreeItem::new(
+                child.name().clone(),
+                child.name().clone(),
+                App::tree_from_group(child)?,
+            )?);
+        }
+        for dataset in group.datasets().unwrap_or(vec![]) {
+            // println!("Found dataset={}", child.name());
+            result.push(TreeItem::new_leaf(
+                dataset.name().clone(),
+                dataset.name().clone(),
+            ));
+        }
+        Ok(result)
     }
 
-    fn tree_from_h5(&self) -> hdf5::Result<()> {
-        let file = hdf5::File::open(self.h5_file_path.clone())?;
-        App::tree_from_group(file.group("/").expect("Couldn't open root group"));
+    fn tree_from_h5(&self) -> Result<Vec<TreeItem<'a, String>>, std::io::Error> {
+        let file = hdf5::File::open(self.h5_file_path.clone())
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, "asd"))?;
+        // dbg!(&file);
+        //
 
-        let ds = file.dataset("random_data")?;
-        let asd = ds.attr_names()?;
-        dbg!(asd);
-        Ok(())
+        // Ok(())
+        App::tree_from_group(file.group("/").expect("Couldn't open root group"))
+
+        // let dataset = file.dataset("/group1/something").map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, "asd"))?;
+
+        // Ok(TreeItem::new(dataset.name().clone(),dataset.name().clone(), vec![])?)
+        // Ok(result)
     }
 
     fn on_click(&mut self, column: u16, row: u16) {
