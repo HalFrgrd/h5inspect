@@ -123,7 +123,7 @@ impl App {
                 let compression_ratio = if data_size > 0 {
                     storage_size as f64 / data_size as f64
                 } else {
-                    0.0
+                    f64::NAN
                 };
 
                 format!(

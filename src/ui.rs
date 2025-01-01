@@ -1,5 +1,4 @@
 use crate::app::{App, Mode};
-use color_eyre::owo_colors::OwoColorize;
 use ratatui::{
     layout::{Constraint, Layout, Position, Rect},
     style::{Color, Style},
@@ -68,7 +67,6 @@ fn render_tree(frame: &mut Frame, app: &mut App, area: Rect) {
     match app.tree.filter(query) {
         Some(filtered_tree) => {
             let filtered_items = filtered_tree.into_tree_item();
-
             let tree_widget = Tree::new(filtered_items.children())
                 .expect("all item identifiers are unique")
                 .highlight_style(Style::new().fg(Color::Black).bg(Color::Blue))

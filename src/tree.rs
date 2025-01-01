@@ -1,3 +1,5 @@
+use fuzzy_matcher::skim::SkimMatcherV2;
+use fuzzy_matcher::FuzzyMatcher;
 use std::collections::HashSet;
 
 #[derive(Debug, Clone)]
@@ -49,10 +51,18 @@ impl TreeNode {
         &self.children
     }
 
+    fn ismatch(haystack: &str, needle: &str) -> bool {
+        if needle.is_empty() {
+            return true;
+        }
+        let matcher = SkimMatcherV2::default();
+        matcher.fuzzy_match(haystack, needle).is_some()
+    }
+
     /// Filter this node and its children based on a search query
     /// Returns None if neither this node nor any children match
     pub fn filter(&self, query: &str) -> Option<TreeNode> {
-        let i_match = self.text.to_lowercase().contains(&query.to_lowercase());
+        let i_match = Self::ismatch(&self.text, query);
 
         let matching_children: Vec<_> = self
             .children
