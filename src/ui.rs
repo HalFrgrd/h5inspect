@@ -1,11 +1,12 @@
 use crate::app::{App, Mode};
+use color_eyre::owo_colors::OwoColorize;
 use ratatui::{
     layout::{Constraint, Layout, Position, Rect},
     style::{Color, Style},
     widgets::{Block, BorderType, Borders, Paragraph, Wrap},
     Frame,
 };
-use tui_tree_widget::{Tree, TreeItem};
+use tui_tree_widget::Tree;
 
 pub fn ui(frame: &mut Frame, app: &mut App) {
     let chunks =
@@ -27,7 +28,6 @@ fn render_object_info(frame: &mut Frame, app: &mut App, area: Rect) {
     let selected = app.tree_state.selected();
     let mut text = "Select on the left".to_string();
     if !selected.is_empty() {
-        // println!("{selected:?}");
         // selected is of form: ["/", "/group1", "/group1/dataset1"]
         text = app.get_text_for(selected.last().unwrap());
     }
@@ -65,12 +65,24 @@ fn render_tree(frame: &mut Frame, app: &mut App, area: Rect) {
         .border_type(BorderType::Rounded);
 
     let query = &app.search_query_and_cursor().0;
-    let filtered_tree = app.tree.filter(query).unwrap();
-    let filtered_items = filtered_tree.into_tree_item();
+    match app.tree.filter(query) {
+        Some(filtered_tree) => {
+            let filtered_items = filtered_tree.into_tree_item();
 
-    let tree_widget = Tree::new(filtered_items.children())
-        .expect("all item identifiers are unique")
-        .highlight_style(Style::new().fg(Color::Black).bg(Color::Blue))
-        .block(tree_block);
-    frame.render_stateful_widget(tree_widget, area, &mut app.tree_state);
+            let tree_widget = Tree::new(filtered_items.children())
+                .expect("all item identifiers are unique")
+                .highlight_style(Style::new().fg(Color::Black).bg(Color::Blue))
+                .block(tree_block);
+            frame.render_stateful_widget(tree_widget, area, &mut app.tree_state);
+        }
+        None => {
+            frame.render_widget(
+                Paragraph::new("No matches found")
+                    .centered()
+                    .block(tree_block)
+                    .style(Style::default().bg(Color::Red)),
+                area,
+            );
+        }
+    }
 }
