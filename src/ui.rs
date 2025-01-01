@@ -58,44 +58,17 @@ fn render_search(frame: &mut Frame, app: &mut App, area: Rect) {
     }
 }
 
-fn ismatch(name: &str, query: &str) -> bool {
-    name.to_lowercase().contains(&query.to_lowercase())
-}
-
-fn filter_tree_items(tree_item: &TreeItem<String>, query: &str) -> Option<TreeItem<String>> {
-    
-    let i_should_stay = ismatch(tree_item.identifier(), query);
-    
-    let children_to_keep = tree_item.children().iter().filter(|child| {
-        ismatch(child.identifier(), query)
-    }).collect::<Vec<_>>();
-
-    if i_should_stay || !children_to_keep.is_empty() {
-        return Some(
-            TreeItem::new(
-                tree_item.identifier(),
-                tree_item.name(),
-                children_to_keep,
-            )   
-        );
-    }
-    None
-}
-
 fn render_tree(frame: &mut Frame, app: &mut App, area: Rect) {
     let tree_block = Block::new()
         .title("asd")
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded);
 
-    let filtered_items = if app.filter_tree_using_search {
-        let query = &app.search_query_and_cursor().0;
-        app.tree_items.iter().filter_map(|item| filter_tree_items(item, query)).collect::<Vec<_>>()
-    } else {
-        app.tree_items.clone()
-    };
+    let query = &app.search_query_and_cursor().0;
+    let filtered_tree = app.tree.filter(query).unwrap();
+    let filtered_items = filtered_tree.into_tree_item();
 
-    let tree_widget = Tree::new(&filtered_items)
+    let tree_widget = Tree::new(filtered_items.children())
         .expect("all item identifiers are unique")
         .highlight_style(Style::new().fg(Color::Black).bg(Color::Blue))
         .block(tree_block);

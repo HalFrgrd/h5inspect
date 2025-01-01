@@ -6,6 +6,7 @@ use std::error::Error;
 mod app;
 mod h5_gen;
 mod h5_utils;
+mod tree;
 mod ui;
 
 fn main() -> Result<(), Box<dyn Error>> {

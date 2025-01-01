@@ -1,3 +1,4 @@
+use crate::tree::TreeNode;
 use crate::ui::ui;
 use crossterm::event::{MouseButton, MouseEventKind};
 use ratatui::layout::Position;
@@ -7,14 +8,13 @@ use ratatui::{
 };
 use std::io;
 use std::path::PathBuf;
-use tui_tree_widget::{TreeItem, TreeState};
+use tui_tree_widget::Tree;
 
-pub struct App<'a> {
+pub struct App {
     pub h5_file_path: PathBuf,
     h5_file: hdf5::File,
-    pub tree_state: TreeState<String>,
-    // TODO we could use i64 id but I don't know how to go from i64 to dataset / group
-    pub tree_items: Vec<TreeItem<'a, String>>,
+    pub tree_state: tui_tree_widget::TreeState<String>,
+    pub tree: TreeNode,
     pub search_query_left: String,
     pub search_query_right: String,
     pub mode: Mode,
@@ -26,8 +26,8 @@ pub enum Mode {
     SearchQueryEditing,
 }
 
-impl<'a> App<'a> {
-    pub fn new(h5_file_path: PathBuf) -> App<'a> {
+impl App {
+    pub fn new(h5_file_path: PathBuf) -> App {
         // let items = vec![
         //     TreeItem::new_leaf("leaf_1_id".to_string(), "leaf_1".to_string()),
         //     TreeItem::new_leaf("leaf_2_id".to_string(), "leaf_2".to_string()),
@@ -49,17 +49,19 @@ impl<'a> App<'a> {
         //     .unwrap(),
         // ];
 
+        let h5_file = hdf5::File::open(&h5_file_path).expect("Couldn't open h5 file");
         let mut app = App {
-            h5_file: hdf5::File::open(h5_file_path.clone()).expect("Couldn't open h5 file"),
+            h5_file,
             h5_file_path,
-            tree_state: TreeState::default(),
-            tree_items: vec![],
+            tree_state: tui_tree_widget::TreeState::default(),
+            tree: TreeNode::new("emptytree", "empty tree", vec![])
+                .expect("Failed to create root node"),
             search_query_left: String::new(),
             search_query_right: String::new(),
             mode: Mode::Normal,
             filter_tree_using_search: false,
         };
-        app.tree_items = app.tree_from_h5().expect("Problem parsing hdf5 structure");
+        app.tree = app.tree_from_h5().expect("Failed to parse HDF5 structure");
         app
     }
 
@@ -68,33 +70,35 @@ impl<'a> App<'a> {
         x.strip_prefix("/").unwrap_or(x)
     }
 
-    fn tree_from_group(group: hdf5::Group) -> Result<Vec<TreeItem<'a, String>>, std::io::Error> {
+    fn tree_from_group(parent_name: &str, group: hdf5::Group) -> Result<TreeNode, std::io::Error> {
         // TODO: avoid circular walks
-        let mut result = Vec::new();
+        let mut children = Vec::new();
 
-        // The identifier for each TreeItem is the unmodified hdf5 group/dataset name.
+        let text = App::relative_child_name(&parent_name, &group.name()).to_string();
+
+        // The identifier for each TreeNode is the unmodified hdf5 group/dataset name.
         // The name is the full path inside the hdf5 file.
         // This allows us to retrieve the object later
 
         for child in group.groups().unwrap_or(vec![]) {
-            result.push(TreeItem::new(
-                child.name(),
-                App::relative_child_name(&group.name(), &child.name()).to_string(),
-                App::tree_from_group(child)?,
-            )?);
+            children.push(App::tree_from_group(&group.name(), child)?);
         }
         for dataset in group.datasets().unwrap_or(vec![]) {
-            result.push(TreeItem::new_leaf(
+            children.push(TreeNode::new(
                 dataset.name(),
                 App::relative_child_name(&group.name(), &dataset.name()).to_string(),
-            ));
+                vec![],
+            )?);
         }
-        Ok(result)
+        TreeNode::new(group.name(), text, children)
     }
 
-    fn tree_from_h5(&self) -> Result<Vec<TreeItem<'a, String>>, std::io::Error> {
+    fn tree_from_h5(&self) -> Result<TreeNode, std::io::Error> {
         // TODO anonymous datasets
-        App::tree_from_group(self.h5_file.group("/").expect("Couldn't open root group"))
+        App::tree_from_group(
+            "/",
+            self.h5_file.group("/").expect("Couldn't open root group"),
+        )
     }
 
     pub fn get_text_for(&self, path_to_object: &str) -> String {
