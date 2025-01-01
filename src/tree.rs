@@ -92,4 +92,14 @@ impl TreeNode {
         tui_tree_widget::TreeItem::new(self.id.clone(), self.text.clone(), children)
             .expect("Already checked for duplicate IDs")
     }
+
+    pub fn contains_path(&self, path: &[String]) -> bool {
+        if path.is_empty() {
+            return true;
+        }
+
+        self.children
+            .iter()
+            .any(|child| child.id == path[0] && child.contains_path(&path[1..]))
+    }
 }
