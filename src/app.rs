@@ -17,7 +17,6 @@ pub struct App {
     pub search_query_left: String,
     pub search_query_right: String,
     pub mode: Mode,
-    pub filter_tree_using_search: bool,
 }
 
 pub enum Mode {
@@ -58,7 +57,6 @@ impl App {
             search_query_left: String::new(),
             search_query_right: String::new(),
             mode: Mode::Normal,
-            filter_tree_using_search: false,
         };
         app.tree = app.tree_from_h5().expect("Failed to parse HDF5 structure");
         app
@@ -174,18 +172,22 @@ impl App {
             KeyCode::Home => self.tree_state.select_first(),
             KeyCode::End => self.tree_state.select_last(),
             KeyCode::Enter => self.tree_state.toggle_selected(),
-            KeyCode::Char('s') => {
-                self.filter_tree_using_search = !self.filter_tree_using_search;
+            KeyCode::Char('f') => {
+                let tree_item = &self.tree.into_tree_item();
+                // We don't build the root so index is 1 off
+                let id_path = vec![];
+                let mut to_visit = vec![(tree_item, id_path)];
+                while let Some((current, id_path)) = to_visit.pop() {
+                    self.tree_state.open(id_path.clone());
+                    to_visit.extend(current.children().iter().map(|c| {
+                        let mut id_path = id_path.clone();
+                        id_path.push(c.identifier().to_string());
+                        (c, id_path)
+                    }));
+                }
+
                 true
             }
-            // KeyCode::Char('f') => {
-            //     // self.tree_items.iter().for_each(|item| {
-            //     //     // dbg!(item);
-            //     //     self.tree_state.open(vec![item.identifier().to_string()]);
-            //     // });
-            //     // self.tree_state.open()
-            //     true
-            // },
             _ => false,
         };
         return;
