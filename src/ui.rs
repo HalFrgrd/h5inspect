@@ -25,23 +25,9 @@ pub fn ui(frame: &mut Frame, app: &mut App) {
         .border_type(BorderType::Rounded);
     frame.render_widget(object_info, chunks[1]);
 
-    let items: Vec<TreeItem<'_, String>> = vec![
-        TreeItem::new_leaf("leaf_1_id".to_string(), "leaf_1".to_string()),
-        TreeItem::new_leaf("leaf_2_id".to_string(), "leaf_2".to_string()),
-        TreeItem::new(
-            "asd_id".to_string(),
-            "asd".to_string(),
-            [
-                TreeItem::new_leaf("leaf_3_id".to_string(), "leaf_3".to_string()),
-                TreeItem::new_leaf("leaf_4_id".to_string(), "leaf_4".to_string()),
-            ]
-            .to_vec(),
-        )
-        .unwrap(),
-    ];
-
-    let tree_widget = Tree::new(&items)
+    let tree_widget = Tree::new(&app.tree_items)
         .expect("all item identifiers are unique")
+        .highlight_style(Style::new().fg(Color::Black).bg(Color::Blue))
         .block(tree_block);
     frame.render_stateful_widget(tree_widget, chunks[0], &mut app.tree_state);
 }

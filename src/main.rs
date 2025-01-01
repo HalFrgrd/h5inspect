@@ -58,7 +58,9 @@ fn handle_events(app: &mut App) -> io::Result<bool> {
                     KeyCode::Char('q') => {
                         return Ok(true);
                     }
-                    _ => {}
+                    other => {
+                        app.on_keypress(other);
+                    }
                 }
             }
         }
