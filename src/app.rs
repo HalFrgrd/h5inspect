@@ -1,11 +1,13 @@
 use crate::ui::ui;
+use clap::builder::Str;
 use crossterm::event::{MouseButton, MouseEventKind};
+use hdf5::dataset;
 use ratatui::layout::Position;
 use ratatui::{
     crossterm::event::{self, Event, KeyCode},
     DefaultTerminal,
 };
-use std::io;
+use std::{fmt, io, path};
 use std::path::PathBuf;
 use tui_tree_widget::{TreeItem, TreeState};
 
@@ -13,7 +15,14 @@ pub struct App<'a> {
     pub h5_file_path: PathBuf,
     h5_file: hdf5::File,
     pub tree_state: TreeState<String>,
+    // TODO we could use i64 id but I don't know how to go from i64 to dataset / group
     pub tree_items: Vec<TreeItem<'a, String>>,
+    pub search_query: String,
+}
+
+enum Mode {
+    Normal,
+    SearchQueryEditing,
 }
 
 impl<'a> App<'a> {
@@ -40,11 +49,11 @@ impl<'a> App<'a> {
         // ];
 
         let mut app = App {
-            h5_file: hdf5::File::open(h5_file_path.clone()).unwrap(),
+            h5_file: hdf5::File::open(h5_file_path.clone()).expect("Couldn't open h5 file"),
             h5_file_path,
-            // h5_file: hdf5::File::open(self.h5_file_path.clone()).map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
             tree_state: TreeState::default(),
             tree_items: vec![],
+            search_query: "search here".to_string(),
         };
         app.tree_items = app.tree_from_h5().expect("Problem parsing hdf5 structure");
         app
@@ -84,11 +93,33 @@ impl<'a> App<'a> {
         App::tree_from_group(self.h5_file.group("/").expect("Couldn't open root group"))
     }
 
-    pub fn get_text_for(&self, path_to_object: &str) -> &str {
+    pub fn get_text_for(&self, path_to_object: &str) -> String {
         // self.h5_file.group(name)
         match self.h5_file.dataset(path_to_object) {
-            Ok(_) => "asd",
-            Err(_) => "not a dataset",
+            Ok(dataset) => {
+                let mut result = String::new();
+                result.push_str("Attributes:\n");
+                for attr in dataset.attr_names().unwrap_or_default(){
+                    if let Ok(attr_value) = dataset.attr(&attr){
+                        result.push_str(&attr);
+                    }
+                }
+
+                result.push_str("\nChunk info:\n");
+                result.push_str(&format!("    is chunked=:{}\n", dataset.is_chunked()));
+
+                result
+            },
+            Err(_) => {
+                match self.h5_file.group(path_to_object) {
+                    Ok(group) => {
+                        "is a group".to_string()
+                    }
+                    Err(_) => {
+                        "what is this?".to_string()
+                    }
+                }
+            },
         }
     }
 
