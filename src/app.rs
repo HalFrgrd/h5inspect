@@ -8,7 +8,6 @@ use ratatui::{
 };
 use std::io;
 use std::path::PathBuf;
-use tui_tree_widget::Tree;
 
 pub struct App {
     pub h5_file_path: PathBuf,
