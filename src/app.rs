@@ -5,8 +5,8 @@ use ratatui::{
     crossterm::event::{self, Event, KeyCode},
     DefaultTerminal,
 };
+use std::io;
 use std::path::PathBuf;
-use std::{io};
 use tui_tree_widget::{TreeItem, TreeState};
 
 pub struct App<'a> {
@@ -18,6 +18,7 @@ pub struct App<'a> {
     pub search_query_left: String,
     pub search_query_right: String,
     pub mode: Mode,
+    pub filter_tree_using_search: bool,
 }
 
 pub enum Mode {
@@ -53,9 +54,10 @@ impl<'a> App<'a> {
             h5_file_path,
             tree_state: TreeState::default(),
             tree_items: vec![],
-            search_query_left: String::from("search here"),
+            search_query_left: String::new(),
             search_query_right: String::new(),
             mode: Mode::Normal,
+            filter_tree_using_search: false,
         };
         app.tree_items = app.tree_from_h5().expect("Problem parsing hdf5 structure");
         app
@@ -131,15 +133,29 @@ impl<'a> App<'a> {
 
     fn on_keypress_normal_mode(&mut self, keycode: KeyCode) {
         let _ = match keycode {
+            KeyCode::Left => self.tree_state.key_left(),
+            KeyCode::Char('h') => self.tree_state.key_left(),
             KeyCode::Up => self.tree_state.key_up(),
-            KeyCode::Left => self.tree_state.key_up(),
             KeyCode::Char('k') => self.tree_state.key_up(),
             KeyCode::Down => self.tree_state.key_down(),
-            KeyCode::Right => self.tree_state.key_down(),
             KeyCode::Char('j') => self.tree_state.key_down(),
+            KeyCode::Right => self.tree_state.key_right(),
+            KeyCode::Char('l') => self.tree_state.key_right(),
             KeyCode::Home => self.tree_state.select_first(),
             KeyCode::End => self.tree_state.select_last(),
             KeyCode::Enter => self.tree_state.toggle_selected(),
+            KeyCode::Char('s') => {
+                self.filter_tree_using_search = !self.filter_tree_using_search;
+                true
+            }
+            // KeyCode::Char('f') => {
+            //     // self.tree_items.iter().for_each(|item| {
+            //     //     // dbg!(item);
+            //     //     self.tree_state.open(vec![item.identifier().to_string()]);
+            //     // });
+            //     // self.tree_state.open()
+            //     true
+            // },
             _ => false,
         };
         return;
@@ -148,36 +164,42 @@ impl<'a> App<'a> {
     // TODO does reversing work fine for all utf8 things?
     pub fn search_query_and_cursor(&self) -> (String, usize) {
         let rev_right: String = self.search_query_right.chars().rev().collect();
-        (self.search_query_left.clone() + &rev_right, self.search_query_left.len())
+        (
+            self.search_query_left.clone() + &rev_right,
+            self.search_query_left.len(),
+        )
     }
 
     fn on_keypress_search_mode(&mut self, keycode: KeyCode) {
         match keycode {
             KeyCode::Char(to_insert) => {
                 self.search_query_left.push(to_insert);
-            },
+            }
             KeyCode::Left => {
-                self.search_query_left.pop().map(|c| self.search_query_right.push(c));
-            },
+                self.search_query_left
+                    .pop()
+                    .map(|c| self.search_query_right.push(c));
+            }
             KeyCode::Right => {
-                self.search_query_right.pop().map(|c| self.search_query_left.push(c));
-            },
-            KeyCode::Home => {
-                self.search_query_right.extend( self.search_query_left.drain(..).rev())
+                self.search_query_right
+                    .pop()
+                    .map(|c| self.search_query_left.push(c));
             }
-            KeyCode::End => {
-                self.search_query_left.extend( self.search_query_right.drain(..).rev())
-            }
+            KeyCode::Home => self
+                .search_query_right
+                .extend(self.search_query_left.drain(..).rev()),
+            KeyCode::End => self
+                .search_query_left
+                .extend(self.search_query_right.drain(..).rev()),
             KeyCode::Backspace => {
                 self.search_query_left.pop();
             }
             KeyCode::Delete => {
                 self.search_query_right.pop();
             }
-            _ => {},
+            _ => {}
         };
     }
-    
 
     pub fn run(mut self, mut terminal: DefaultTerminal) -> io::Result<bool> {
         loop {
@@ -208,7 +230,7 @@ impl<'a> App<'a> {
                         Mode::SearchQueryEditing => match key.code {
                             KeyCode::Esc | KeyCode::Enter => {
                                 self.mode = Mode::Normal;
-                            },
+                            }
                             other => {
                                 self.on_keypress_search_mode(other);
                             }
