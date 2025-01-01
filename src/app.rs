@@ -6,9 +6,8 @@ use ratatui::{
     DefaultTerminal,
 };
 use std::io;
-use tui_tree_widget::{Tree, TreeItem, TreeState};
 use std::path::PathBuf;
-use crate::h5_utils;
+use tui_tree_widget::{TreeItem, TreeState};
 
 pub struct App {
     pub h5_file_path: PathBuf,
@@ -44,13 +43,12 @@ impl App {
             tree_state: TreeState::default(),
             tree_items: items,
         };
-        app.tree_from_h5();
+        let _ = app.tree_from_h5();
         app
     }
 
     fn tree_from_group(group: hdf5::Group) {
         dbg!(group);
-
     }
 
     fn tree_from_h5(&self) -> hdf5::Result<()> {
@@ -61,7 +59,6 @@ impl App {
         let asd = ds.attr_names()?;
         dbg!(asd);
         Ok(())
-
     }
 
     fn on_click(&mut self, column: u16, row: u16) {
