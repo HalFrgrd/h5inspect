@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+color-eyre = "0.6.3"
 crossterm = "0.28.1"
 hdf5 = "0.8.1"
 ndarray = "0.16.1"

@@ -1,4 +1,4 @@
-use hdf5::{File, H5Type, Result};
+use hdf5::{File, Result};
 
 
 pub fn read_hdf5() -> Result<()> {

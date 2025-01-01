@@ -1,11 +1,10 @@
 use ratatui::{
-    layout::{Constraint, Direction, Layout, Rect},
+    layout::{Constraint, Layout},
     style::{Color, Style},
-    text::{Line, Span, Text},
-    widgets::{Block, BorderType, Borders, Clear, List, ListItem, Paragraph, Wrap},
+    widgets::{Block, BorderType, Borders},
     Frame,
 };
-use tui_tree_widget::{Tree, TreeItem, TreeState};
+use tui_tree_widget::Tree;
 
 use crate::app::App;
 

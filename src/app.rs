@@ -1,6 +1,16 @@
-use crossterm::event::KeyCode;
 use ratatui::layout::Position;
-use tui_tree_widget::{Tree, TreeItem, TreeState};
+use tui_tree_widget::{TreeItem, TreeState};
+use crossterm::event::{MouseButton, MouseEventKind};
+use std::io;
+
+use crate::ui::ui;
+use ratatui::{
+    backend::{Backend, CrosstermBackend}, crossterm::{
+        event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
+        execute,
+        terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    }, DefaultTerminal, Terminal
+};
 
 pub struct App {
     pub file_name: String,
@@ -38,7 +48,7 @@ impl App {
         }
     }
 
-    pub fn on_click(&mut self, column: u16, row: u16) {
+    fn on_click(&mut self, column: u16, row: u16) {
         let position = Position::new(column, row);
 
         if let Some(id) = self.tree_state.rendered_at(position) {
@@ -48,7 +58,7 @@ impl App {
         }
     }
 
-    pub fn on_keypress(&mut self, keycode: KeyCode) {
+    fn on_keypress(&mut self, keycode: KeyCode) {
         let _ = match keycode {
             KeyCode::Up => self.tree_state.key_up(),
             KeyCode::Left => self.tree_state.key_up(),
@@ -63,4 +73,40 @@ impl App {
         };
         return;
     }
+
+
+    pub fn run(mut self, mut terminal: DefaultTerminal) -> io::Result<bool> {
+        loop {
+            terminal.draw(|f| ui(f, &mut self))?;
+    
+            if let Ok(true) = self.handle_events() {
+                return Ok(true);
+            }
+        }
+    }
+    
+    fn handle_events(&mut self) -> io::Result<bool> {
+        match event::read()? {
+            Event::Key(key) => {
+                if key.kind == event::KeyEventKind::Press {
+                    match key.code {
+                        KeyCode::Char('q') => {
+                            return Ok(true);
+                        }
+                        other => {
+                            self.on_keypress(other);
+                        }
+                    }
+                }
+            }
+            Event::Mouse(mouse) => match mouse.kind {
+                MouseEventKind::Down(MouseButton::Left) => self.on_click(mouse.column, mouse.row),
+                _ => {}
+            },
+            _ => {}
+        }
+        return Ok(false);
+    }
+    
+
 }
