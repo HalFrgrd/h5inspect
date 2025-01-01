@@ -118,8 +118,8 @@ impl App {
                 // Get storage size vs data size
                 let storage_size = dataset.storage_size();
                 let data_size = dataset.size() * dataset.dtype().map_or(0, |dt| dt.size());
-                let compression_ratio = if data_size > 0 {
-                    storage_size as f64 / data_size as f64
+                let compression_ratio = if storage_size > 0 {
+                    data_size as f64 / storage_size as f64
                 } else {
                     f64::NAN
                 };
@@ -172,20 +172,18 @@ impl App {
             KeyCode::Home => self.tree_state.select_first(),
             KeyCode::End => self.tree_state.select_last(),
             KeyCode::Enter => self.tree_state.toggle_selected(),
+            KeyCode::Char('e') => self.tree_state.select(vec!["/variable".to_string()]),
             KeyCode::Char('f') => {
-                let tree_item = &self.tree.into_tree_item();
                 // We don't build the root so index is 1 off
-                let id_path = vec![];
-                let mut to_visit = vec![(tree_item, id_path)];
+                let mut to_visit = vec![(&self.tree, vec![])];
                 while let Some((current, id_path)) = to_visit.pop() {
                     self.tree_state.open(id_path.clone());
                     to_visit.extend(current.children().iter().map(|c| {
                         let mut id_path = id_path.clone();
-                        id_path.push(c.identifier().to_string());
+                        id_path.push(c.id().to_string());
                         (c, id_path)
                     }));
                 }
-
                 true
             }
             _ => false,
