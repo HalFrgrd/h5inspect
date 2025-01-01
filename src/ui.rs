@@ -10,6 +10,15 @@ use tui_tree_widget::Tree;
 pub fn ui(frame: &mut Frame, app: &mut App) {
     let chunks =
         Layout::horizontal([Constraint::Length(40), Constraint::Min(0)]).split(frame.area());
+    
+    let left_layout = Layout::vertical([Constraint::Min(0), Constraint::Length(3)]).split(chunks[0]);
+
+    let search_block = Block::new()
+        .title("Search")
+        .borders(Borders::ALL)
+        .border_type(BorderType::Rounded);
+    let search_query = Paragraph::new(app.search_query.as_str()).block(search_block);
+    frame.render_widget(search_query, left_layout[1]);
 
     let tree_block = Block::new()
         .title(app.h5_file_path.to_str().unwrap_or("asd"))
@@ -33,14 +42,14 @@ pub fn ui(frame: &mut Frame, app: &mut App) {
         .highlight_style(Style::new().fg(Color::Black).bg(Color::Blue))
         // .node_no_children_symbol(">")
         .block(tree_block);
-    frame.render_stateful_widget(tree_widget, chunks[0], &mut app.tree_state);
+    frame.render_stateful_widget(tree_widget, left_layout[0], &mut app.tree_state);
 
     // let selected = app.tree_state.selected() {}
     // let text = "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.";
     // let text
 
     let selected = app.tree_state.selected();
-    let mut text = "Select on the left";
+    let mut text = "Select on the left".to_string();
     if !selected.is_empty() {
         // println!("{selected:?}");
         // selected is of form: ["/", "/group1", "/group1/dataset1"]
