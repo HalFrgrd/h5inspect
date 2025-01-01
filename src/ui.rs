@@ -5,7 +5,7 @@ use ratatui::{
     widgets::{Block, BorderType, Borders, Paragraph, Wrap},
     Frame,
 };
-use tui_tree_widget::Tree;
+use tui_tree_widget::{Tree, TreeItem};
 
 pub fn ui(frame: &mut Frame, app: &mut App) {
     let chunks =
@@ -58,35 +58,46 @@ fn render_search(frame: &mut Frame, app: &mut App, area: Rect) {
     }
 }
 
+fn ismatch(name: &str, query: &str) -> bool {
+    name.to_lowercase().contains(&query.to_lowercase())
+}
+
+fn filter_tree_items(tree_item: &TreeItem<String>, query: &str) -> Option<TreeItem<String>> {
+    
+    let i_should_stay = ismatch(tree_item.identifier(), query);
+    
+    let children_to_keep = tree_item.children().iter().filter(|child| {
+        ismatch(child.identifier(), query)
+    }).collect::<Vec<_>>();
+
+    if i_should_stay || !children_to_keep.is_empty() {
+        return Some(
+            TreeItem::new(
+                tree_item.identifier(),
+                tree_item.name(),
+                children_to_keep,
+            )   
+        );
+    }
+    None
+}
+
 fn render_tree(frame: &mut Frame, app: &mut App, area: Rect) {
     let tree_block = Block::new()
         .title("asd")
-        // .title(app.h5_file_path.to_str().unwrap_or("asd"))
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded);
 
-    let tree_widget = Tree::new(&app.tree_items)
+    let filtered_items = if app.filter_tree_using_search {
+        let query = &app.search_query_and_cursor().0;
+        app.tree_items.iter().filter_map(|item| filter_tree_items(item, query)).collect::<Vec<_>>()
+    } else {
+        app.tree_items.clone()
+    };
+
+    let tree_widget = Tree::new(&filtered_items)
         .expect("all item identifiers are unique")
         .highlight_style(Style::new().fg(Color::Black).bg(Color::Blue))
-        // .node_no_children_symbol(">")
         .block(tree_block);
     frame.render_stateful_widget(tree_widget, area, &mut app.tree_state);
 }
-
-// fn ismatch(name: &str) -> bool {
-//     name.contains("qwe")
-// }
-
-// fn filter_tree_items(tree_item: &TreeItem<String>) -> TreeItem<String> {
-//     let mut filtered = tree_item.clone();
-//     filtered.children().retain(|child| {
-//         let name = child.data.as_str();
-//         ismatch(name) || !child.children.is_empty()
-//     });
-
-//     for child in &mut filtered.children() {
-//         *child = filter_tree_items(child);
-//     }
-
-//     filtered
-// }
