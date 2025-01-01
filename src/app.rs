@@ -1,15 +1,12 @@
 use crate::ui::ui;
-use clap::builder::Str;
 use crossterm::event::{MouseButton, MouseEventKind};
-use crossterm::style::Stylize;
-use hdf5::dataset;
 use ratatui::layout::Position;
 use ratatui::{
     crossterm::event::{self, Event, KeyCode},
     DefaultTerminal,
 };
 use std::path::PathBuf;
-use std::{fmt, io, path};
+use std::{io};
 use tui_tree_widget::{TreeItem, TreeState};
 
 pub struct App<'a> {
@@ -105,7 +102,7 @@ impl<'a> App<'a> {
                 let mut result = String::new();
                 result.push_str("Attributes:\n");
                 for attr in dataset.attr_names().unwrap_or_default() {
-                    if let Ok(attr_value) = dataset.attr(&attr) {
+                    if let Ok(_) = dataset.attr(&attr) {
                         result.push_str(&attr);
                     }
                 }
@@ -116,7 +113,7 @@ impl<'a> App<'a> {
                 result
             }
             Err(_) => match self.h5_file.group(path_to_object) {
-                Ok(group) => "is a group".to_string(),
+                Ok(_) => "is a group".to_string(),
                 Err(_) => "what is this?".to_string(),
             },
         }
