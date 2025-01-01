@@ -59,7 +59,7 @@ fn render_search(frame: &mut Frame, app: &mut App, area: Rect) {
 
 fn render_tree(frame: &mut Frame, app: &mut App, area: Rect) {
     let tree_block = Block::new()
-        .title("asd")
+        .title(app.h5_file_path.to_str().unwrap_or("unknown file"))
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded);
 
@@ -67,6 +67,9 @@ fn render_tree(frame: &mut Frame, app: &mut App, area: Rect) {
     match app.tree.filter(query) {
         Some(filtered_tree) => {
             let filtered_items = filtered_tree.into_tree_item();
+            // Use root's children instead of root
+            // let tree_widget = Tree::new(filtered_items)
+            // let tree_widget = Tree::new(vec![filtered_items])
             let tree_widget = Tree::new(filtered_items.children())
                 .expect("all item identifiers are unique")
                 .highlight_style(Style::new().fg(Color::Black).bg(Color::Blue))
