@@ -2,21 +2,22 @@ use crate::ui::ui;
 use crossterm::event::{MouseButton, MouseEventKind};
 use ratatui::layout::Position;
 use ratatui::{
-    backend::Backend,
     crossterm::event::{self, Event, KeyCode},
     DefaultTerminal,
 };
 use std::io;
-use tui_tree_widget::{TreeItem, TreeState};
+use tui_tree_widget::{Tree, TreeItem, TreeState};
+use std::path::PathBuf;
+use crate::h5_utils;
 
 pub struct App {
-    pub file_name: String,
+    pub h5_file_path: PathBuf,
     pub tree_state: TreeState<String>,
     pub tree_items: Vec<TreeItem<'static, String>>,
 }
 
 impl App {
-    pub fn new() -> App {
+    pub fn new(h5_file_path: PathBuf) -> App {
         let items = vec![
             TreeItem::new_leaf("leaf_1_id".to_string(), "leaf_1".to_string()),
             TreeItem::new_leaf("leaf_2_id".to_string(), "leaf_2".to_string()),
@@ -38,11 +39,29 @@ impl App {
             .unwrap(),
         ];
 
-        App {
-            file_name: "test file name.h5".to_string(),
+        let app = App {
+            h5_file_path,
             tree_state: TreeState::default(),
             tree_items: items,
-        }
+        };
+        app.tree_from_h5();
+        app
+    }
+
+    fn tree_from_group(group: hdf5::Group) {
+        dbg!(group);
+
+    }
+
+    fn tree_from_h5(&self) -> hdf5::Result<()> {
+        let file = hdf5::File::open(self.h5_file_path.clone())?;
+        App::tree_from_group(file.group("/").expect("Couldn't open root group"));
+
+        let ds = file.dataset("random_data")?;
+        let asd = ds.attr_names()?;
+        dbg!(asd);
+        Ok(())
+
     }
 
     fn on_click(&mut self, column: u16, row: u16) {

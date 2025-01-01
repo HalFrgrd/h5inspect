@@ -12,7 +12,7 @@ pub fn ui(frame: &mut Frame, app: &mut App) {
         Layout::horizontal([Constraint::Length(40), Constraint::Min(0)]).split(frame.area());
 
     let tree_block = Block::new()
-        .title(app.file_name.clone())
+        .title(app.h5_file_path.to_str().unwrap_or("asd") )
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded);
     // frame.render_widget(tree_block, chunks[0]);
