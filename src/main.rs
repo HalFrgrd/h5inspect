@@ -16,7 +16,10 @@ mod ui;
 use crate::app::App;
 use crate::ui::ui;
 
+mod h5_utils;
+
 fn main() -> Result<(), Box<dyn Error>> {
+    crate::h5_utils::read_hdf5()?;
     // setup terminal
     enable_raw_mode()?;
     let mut stderr = io::stderr(); // This is a special case. Normally using stdout is fine

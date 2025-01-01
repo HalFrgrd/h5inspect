@@ -23,6 +23,12 @@ impl App {
                 .to_vec(),
             )
             .unwrap(),
+            TreeItem::new(
+                "no_child_id".to_string(),
+                "no children".to_string(),
+                Vec::new(),
+            )
+            .unwrap(),
         ];
 
         App {
@@ -46,8 +52,10 @@ impl App {
         let _ = match keycode {
             KeyCode::Up => self.tree_state.key_up(),
             KeyCode::Left => self.tree_state.key_up(),
+            KeyCode::Char('k') => self.tree_state.key_up(),
             KeyCode::Down => self.tree_state.key_down(),
             KeyCode::Right => self.tree_state.key_down(),
+            KeyCode::Char('j') => self.tree_state.key_down(),
             KeyCode::Home => self.tree_state.select_first(),
             KeyCode::End => self.tree_state.select_last(),
             KeyCode::Enter => self.tree_state.toggle_selected(),
