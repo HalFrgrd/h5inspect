@@ -41,5 +41,12 @@ pub fn generate_dummy_file() -> Result<()> {
         .create("something")?;
     group1_d1.write(&arr)?;
 
+    let group2 = group1.create_group("group2")?;
+    let group2_d1 = group2
+        .new_dataset::<i32>()
+        .shape((ny, nx))
+        .create("qweqwe")?;
+    group2_d1.write(&arr)?;
+
     Ok(())
 }
