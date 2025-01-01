@@ -104,21 +104,48 @@ impl App {
         // self.h5_file.group(name)
         match self.h5_file.dataset(path_to_object) {
             Ok(dataset) => {
-                let mut result = String::new();
-                result.push_str("Attributes:\n");
-                for attr in dataset.attr_names().unwrap_or_default() {
-                    if let Ok(_) = dataset.attr(&attr) {
-                        result.push_str(&attr);
-                    }
-                }
+                let shape = dataset.shape();
+                let datatype = dataset.dtype();
+                let space = dataset.space();
+                let chunks = dataset.chunk();
+                let chunk_info = match chunks {
+                    Some(chunks) => format!("Chunked ({:?})", chunks),
+                    None => "Contiguous".to_string(),
+                };
 
-                result.push_str("\nChunk info:\n");
-                result.push_str(&format!("    is chunked=:{}\n", dataset.is_chunked()));
+                // Get compression info
+                let compression = dataset.filters();
+                let compression_info = format!("Filter pipeline: {:?}", compression);
 
-                result
+                // Get storage size vs data size
+                let storage_size = dataset.storage_size();
+                let data_size = dataset.size() * dataset.dtype().map_or(0, |dt| dt.size());
+                let compression_ratio = if data_size > 0 {
+                    storage_size as f64 / data_size as f64
+                } else {
+                    0.0
+                };
+
+                format!(
+                    "Dataset info:\nShape: {:?}\nDatatype: {:?}\nSpace: {:?}\nStorage: {}\nCompression: {}\nStorage size: {} bytes\nData size: {} bytes\nCompression ratio: {:.2}",
+                    shape, datatype, space, chunk_info, compression_info, storage_size, data_size, compression_ratio
+                )
             }
             Err(_) => match self.h5_file.group(path_to_object) {
-                Ok(_) => "is a group".to_string(),
+                Ok(group) => {
+                    let num_groups = group.groups().unwrap_or(vec![]).len();
+                    let num_datasets = group.datasets().unwrap_or(vec![]).len();
+                    let attrs = group.attr_names().unwrap_or(vec![]);
+                    let num_attrs = attrs.len();
+
+                    format!(
+                        "Group info:\nNumber of groups: {}\nNumber of datasets: {}\nNumber of attributes: {}\nAttribute names: {:?}",
+                        num_groups,
+                        num_datasets,
+                        num_attrs,
+                        attrs
+                    )
+                }
                 Err(_) => "what is this?".to_string(),
             },
         }
