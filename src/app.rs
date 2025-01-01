@@ -1,14 +1,15 @@
 use crate::ui::ui;
 use clap::builder::Str;
 use crossterm::event::{MouseButton, MouseEventKind};
+use crossterm::style::Stylize;
 use hdf5::dataset;
 use ratatui::layout::Position;
 use ratatui::{
     crossterm::event::{self, Event, KeyCode},
     DefaultTerminal,
 };
-use std::{fmt, io, path};
 use std::path::PathBuf;
+use std::{fmt, io, path};
 use tui_tree_widget::{TreeItem, TreeState};
 
 pub struct App<'a> {
@@ -17,10 +18,12 @@ pub struct App<'a> {
     pub tree_state: TreeState<String>,
     // TODO we could use i64 id but I don't know how to go from i64 to dataset / group
     pub tree_items: Vec<TreeItem<'a, String>>,
-    pub search_query: String,
+    pub search_query_left: String,
+    pub search_query_right: String,
+    pub mode: Mode,
 }
 
-enum Mode {
+pub enum Mode {
     Normal,
     SearchQueryEditing,
 }
@@ -53,7 +56,9 @@ impl<'a> App<'a> {
             h5_file_path,
             tree_state: TreeState::default(),
             tree_items: vec![],
-            search_query: "search here".to_string(),
+            search_query_left: String::from("search here"),
+            search_query_right: String::new(),
+            mode: Mode::Normal,
         };
         app.tree_items = app.tree_from_h5().expect("Problem parsing hdf5 structure");
         app
@@ -99,8 +104,8 @@ impl<'a> App<'a> {
             Ok(dataset) => {
                 let mut result = String::new();
                 result.push_str("Attributes:\n");
-                for attr in dataset.attr_names().unwrap_or_default(){
-                    if let Ok(attr_value) = dataset.attr(&attr){
+                for attr in dataset.attr_names().unwrap_or_default() {
+                    if let Ok(attr_value) = dataset.attr(&attr) {
                         result.push_str(&attr);
                     }
                 }
@@ -109,16 +114,10 @@ impl<'a> App<'a> {
                 result.push_str(&format!("    is chunked=:{}\n", dataset.is_chunked()));
 
                 result
-            },
-            Err(_) => {
-                match self.h5_file.group(path_to_object) {
-                    Ok(group) => {
-                        "is a group".to_string()
-                    }
-                    Err(_) => {
-                        "what is this?".to_string()
-                    }
-                }
+            }
+            Err(_) => match self.h5_file.group(path_to_object) {
+                Ok(group) => "is a group".to_string(),
+                Err(_) => "what is this?".to_string(),
             },
         }
     }
@@ -133,7 +132,7 @@ impl<'a> App<'a> {
         }
     }
 
-    fn on_keypress(&mut self, keycode: KeyCode) {
+    fn on_keypress_normal_mode(&mut self, keycode: KeyCode) {
         let _ = match keycode {
             KeyCode::Up => self.tree_state.key_up(),
             KeyCode::Left => self.tree_state.key_up(),
@@ -149,6 +148,40 @@ impl<'a> App<'a> {
         return;
     }
 
+    // TODO does reversing work fine for all utf8 things?
+    pub fn search_query_and_cursor(&self) -> (String, usize) {
+        let rev_right: String = self.search_query_right.chars().rev().collect();
+        (self.search_query_left.clone() + &rev_right, self.search_query_left.len())
+    }
+
+    fn on_keypress_search_mode(&mut self, keycode: KeyCode) {
+        match keycode {
+            KeyCode::Char(to_insert) => {
+                self.search_query_left.push(to_insert);
+            },
+            KeyCode::Left => {
+                self.search_query_left.pop().map(|c| self.search_query_right.push(c));
+            },
+            KeyCode::Right => {
+                self.search_query_right.pop().map(|c| self.search_query_left.push(c));
+            },
+            KeyCode::Home => {
+                self.search_query_right.extend( self.search_query_left.drain(..).rev())
+            }
+            KeyCode::End => {
+                self.search_query_left.extend( self.search_query_right.drain(..).rev())
+            }
+            KeyCode::Backspace => {
+                self.search_query_left.pop();
+            }
+            KeyCode::Delete => {
+                self.search_query_right.pop();
+            }
+            _ => {},
+        };
+    }
+    
+
     pub fn run(mut self, mut terminal: DefaultTerminal) -> io::Result<bool> {
         loop {
             terminal.draw(|f| ui(f, &mut self))?;
@@ -163,13 +196,26 @@ impl<'a> App<'a> {
         match event::read()? {
             Event::Key(key) => {
                 if key.kind == event::KeyEventKind::Press {
-                    match key.code {
-                        KeyCode::Char('q') => {
-                            return Ok(true);
-                        }
-                        other => {
-                            self.on_keypress(other);
-                        }
+                    match self.mode {
+                        Mode::Normal => match key.code {
+                            KeyCode::Char('q') | KeyCode::Esc => {
+                                return Ok(true);
+                            }
+                            KeyCode::Char('/') => {
+                                self.mode = Mode::SearchQueryEditing;
+                            }
+                            other => {
+                                self.on_keypress_normal_mode(other);
+                            }
+                        },
+                        Mode::SearchQueryEditing => match key.code {
+                            KeyCode::Esc | KeyCode::Enter => {
+                                self.mode = Mode::Normal;
+                            },
+                            other => {
+                                self.on_keypress_search_mode(other);
+                            }
+                        },
                     }
                 }
             }

@@ -1,6 +1,6 @@
-use crate::app::App;
+use crate::app::{App, Mode};
 use ratatui::{
-    layout::{Constraint, Layout},
+    layout::{Constraint, Layout, Position},
     style::{Color, Style},
     widgets::{Block, BorderType, Borders, Paragraph, Wrap},
     Frame,
@@ -10,15 +10,30 @@ use tui_tree_widget::Tree;
 pub fn ui(frame: &mut Frame, app: &mut App) {
     let chunks =
         Layout::horizontal([Constraint::Length(40), Constraint::Min(0)]).split(frame.area());
-    
-    let left_layout = Layout::vertical([Constraint::Min(0), Constraint::Length(3)]).split(chunks[0]);
+
+    let left_layout =
+        Layout::vertical([Constraint::Min(0), Constraint::Length(3)]).split(chunks[0]);
 
     let search_block = Block::new()
         .title("Search")
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded);
-    let search_query = Paragraph::new(app.search_query.as_str()).block(search_block);
+
+    let (search_query_text, search_query_cursor_pos) = app.search_query_and_cursor();
+    let search_query = Paragraph::new(search_query_text.as_str()).block(search_block);
     frame.render_widget(search_query, left_layout[1]);
+    match app.mode {
+        Mode::Normal => {},
+        Mode::SearchQueryEditing => {
+            frame.set_cursor_position(Position::new(
+                // Draw the cursor at the current position in the input field.
+                // This position is can be controlled via the left and right arrow key
+                left_layout[1].x + search_query_cursor_pos as u16 + 1,
+                // Move one line down, from the border to the input line
+                left_layout[1].y + 1,
+            ))
+        },
+    }
 
     let tree_block = Block::new()
         .title(app.h5_file_path.to_str().unwrap_or("asd"))
