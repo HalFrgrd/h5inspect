@@ -1,15 +1,9 @@
 use fuzzy_matcher::skim::SkimMatcherV2;
 use fuzzy_matcher::FuzzyMatcher;
-use ratatui::style::Color;
-use ratatui::style::Style;
-use ratatui::text::Line;
-use ratatui::text::Span;
+
 use std::collections::HashSet;
 
-type NodeId = String;
-
-pub const STYLE_DARKGRAY: Style = Style::new().fg(Color::Gray);
-const STYLE_MATCH: Style = Style::new().fg(Color::Magenta);
+pub type NodeId = String;
 
 #[derive(Debug, Clone)]
 pub struct TreeNode {
@@ -56,9 +50,24 @@ impl TreeNode {
         &self.id
     }
 
+    /// Get a reference to this node's text
+    pub fn text(&self) -> &str {
+        &self.text
+    }
+
     /// Get a reference to this node's children
     pub fn children(&self) -> &[TreeNode] {
         &self.children
+    }
+
+    /// Get a reference to this node's recursive number of children
+    pub fn recursive_num_children(&self) -> usize {
+        self.recursive_num_children
+    }
+
+    /// Get a reference to this node's matching indices
+    pub fn matching_indices(&self) -> Option<&Vec<usize>> {
+        self.matching_indices.as_ref()
     }
 
     fn ismatch(haystack: &str, needle: &str) -> Option<Vec<usize>> {
@@ -97,39 +106,6 @@ impl TreeNode {
         } else {
             None
         }
-    }
-
-    /// Convert this TreeNode into a tui_tree_widget::TreeItem
-    pub fn into_tree_item(&self) -> tui_tree_widget::TreeItem<NodeId> {
-        let children: Vec<_> = self
-            .children
-            .iter()
-            .map(|child| child.into_tree_item())
-            .collect();
-
-        let mut formatted_text = if let Some(indices) = &self.matching_indices {
-            let mut spans = self
-                .text
-                .chars()
-                .map(|c| Span::raw(c.to_string()))
-                .collect::<Vec<_>>();
-            for index in indices {
-                spans[*index].style = STYLE_MATCH;
-            }
-            Line::from(spans)
-        } else {
-            Line::from(self.text.clone())
-        };
-
-        if self.recursive_num_children > 0 {
-            formatted_text.push_span(Span::styled(
-                format!(" ({})", self.recursive_num_children),
-                STYLE_DARKGRAY,
-            ));
-        }
-
-        tui_tree_widget::TreeItem::new(self.id.clone(), formatted_text, children)
-            .expect("Already checked for duplicate IDs")
     }
 
     pub fn contains_path(&self, path: &[NodeId]) -> bool {

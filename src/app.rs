@@ -4,7 +4,6 @@ use crossterm::event::{MouseButton, MouseEventKind};
 use ratatui::layout::Position;
 use ratatui::{
     crossterm::event::{self, Event, KeyCode},
-    text::Span,
     DefaultTerminal,
 };
 use std::io;
@@ -47,30 +46,32 @@ impl App {
         x.strip_prefix("/").unwrap_or(x).to_string()
     }
 
-    fn tree_from_group(parent_name: &str, group: hdf5::Group) -> Result<TreeNode, std::io::Error> {
-        // TODO: avoid circular walks
-        let mut children = Vec::new();
-
-        // The identifier for each TreeNode is the unmodified hdf5 group/dataset name.
-        // The name is the full path inside the hdf5 file.
-        // This allows us to retrieve the object later
-
-        for child in group.groups().unwrap_or(vec![]) {
-            children.push(App::tree_from_group(&group.name(), child)?);
-        }
-        for dataset in group.datasets().unwrap_or(vec![]) {
-            let dataset_name = dataset.name();
-            let text = App::relative_child_name(&group.name(), &dataset_name);
-            children.push(TreeNode::new(dataset_name, text, vec![])?);
-        }
-        let group_name = group.name();
-        let text = App::relative_child_name(&parent_name, &group_name);
-        TreeNode::new(group_name, text, children)
-    }
-
     fn tree_from_h5(&self) -> Result<TreeNode, std::io::Error> {
+        fn tree_from_group(
+            parent_name: &str,
+            group: hdf5::Group,
+        ) -> Result<TreeNode, std::io::Error> {
+            // TODO: avoid circular walks
+            let mut children = Vec::new();
+
+            // The identifier for each TreeNode is the unmodified hdf5 group/dataset name.
+            // The name is the full path inside the hdf5 file.
+            // This allows us to retrieve the object later
+
+            for child in group.groups().unwrap_or(vec![]) {
+                children.push(tree_from_group(&group.name(), child)?);
+            }
+            for dataset in group.datasets().unwrap_or(vec![]) {
+                let dataset_name = dataset.name();
+                let text = App::relative_child_name(&group.name(), &dataset_name);
+                children.push(TreeNode::new(dataset_name, text, vec![])?);
+            }
+            let group_name = group.name();
+            let text = App::relative_child_name(&parent_name, &group_name);
+            TreeNode::new(group_name, text, children)
+        }
         // TODO anonymous datasets
-        App::tree_from_group(
+        tree_from_group(
             "/",
             self.h5_file.group("/").expect("Couldn't open root group"),
         )
