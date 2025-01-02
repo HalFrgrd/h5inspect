@@ -14,6 +14,15 @@ pub struct TreeNode {
 
 impl TreeNode {
     pub fn new(id: impl Into<NodeId>, text: impl Into<String>, children: Vec<TreeNode>) -> Self {
+        Self::new_with_indices(id, text, children, vec![])
+    }
+
+    fn new_with_indices(
+        id: impl Into<NodeId>,
+        text: impl Into<String>,
+        children: Vec<TreeNode>,
+        indices: Vec<usize>,
+    ) -> Self {
         let recursive_num_children: usize = children
             .iter()
             .map(|child| child.recursive_num_children)
@@ -25,7 +34,7 @@ impl TreeNode {
             text: text.into(),
             children,
             recursive_num_children,
-            matching_indices: vec![],
+            matching_indices: indices,
         }
     }
 
@@ -74,11 +83,12 @@ impl TreeNode {
             .collect();
 
         if i_match || !matching_children.is_empty() {
-            let mut node = TreeNode::new(self.id.clone(), self.text.clone(), matching_children);
-
-            node.matching_indices = indices.unwrap_or(vec![]);
-
-            Some(node)
+            Some(TreeNode::new_with_indices(
+                self.id.clone(),
+                self.text.clone(),
+                matching_children,
+                indices.unwrap_or(vec![]),
+            ))
         } else {
             None
         }

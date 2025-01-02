@@ -50,20 +50,29 @@ impl App {
     fn tree_from_h5(&self) -> Result<TreeNode, std::io::Error> {
         fn tree_from_group(parent_name: &str, group: hdf5::Group) -> TreeNode {
             // TODO: avoid circular walks
-            let mut children = Vec::new();
-
             // The identifier for each TreeNode is the unmodified hdf5 group/dataset name.
             // The name is the full path inside the hdf5 file.
             // This allows us to retrieve the object later
 
-            for child in group.groups().unwrap_or(vec![]) {
-                children.push(tree_from_group(&group.name(), child));
-            }
-            for dataset in group.datasets().unwrap_or(vec![]) {
-                let dataset_name = dataset.name();
-                let text = App::relative_child_name(&group.name(), &dataset_name).to_string();
-                children.push(TreeNode::new(dataset_name, text, vec![]));
-            }
+            let mut children: Vec<_> = group
+                .groups()
+                .unwrap_or(vec![])
+                .into_iter()
+                .map(|child| tree_from_group(&group.name(), child))
+                .collect();
+
+            children.extend(
+                group
+                    .datasets()
+                    .unwrap_or(vec![])
+                    .into_iter()
+                    .map(|dataset| {
+                        let dataset_name = dataset.name();
+                        let text = App::relative_child_name(&group.name(), &dataset_name);
+                        TreeNode::new(&dataset_name, text, vec![])
+                    }),
+            );
+
             let text = App::relative_child_name(&parent_name, &group.name()).to_string();
             TreeNode::new(group.name(), text, children)
         }
