@@ -6,6 +6,7 @@ use ratatui::{
     crossterm::event::{self, Event, KeyCode},
     DefaultTerminal,
 };
+use std::cell::OnceCell;
 use std::io;
 use std::path::PathBuf;
 
@@ -13,7 +14,7 @@ pub struct App {
     pub h5_file_path: PathBuf,
     pub h5_file: hdf5::File,
     pub tree_state: tui_tree_widget::TreeState<String>,
-    pub tree: TreeNode,
+    pub tree: OnceCell<TreeNode>,
     pub search_query_left: String,
     pub search_query_right: String,
     pub mode: Mode,
@@ -26,18 +27,18 @@ pub enum Mode {
 
 impl App {
     pub fn new(h5_file_path: PathBuf) -> App {
-        let mut app = App {
+        let app = App {
             h5_file_path: h5_file_path.clone(),
             h5_file: hdf5::File::open(h5_file_path).expect("Couldn't open h5 file"),
             tree_state: tui_tree_widget::TreeState::default(),
-            tree: TreeNode::new("emptytree", "empty tree".to_string(), vec![])
-                .expect("Failed to create root node"),
+            tree: OnceCell::new(),
             search_query_left: String::new(),
             search_query_right: String::new(),
             mode: Mode::Normal,
         };
-        let tree = app.tree_from_h5().expect("Failed to parse HDF5 structure");
-        app.tree = tree;
+        app.tree
+            .set(app.tree_from_h5().expect("Failed to parse HDF5 structure"))
+            .unwrap();
         app
     }
 
@@ -64,11 +65,11 @@ impl App {
             for dataset in group.datasets().unwrap_or(vec![]) {
                 let dataset_name = dataset.name();
                 let text = App::relative_child_name(&group.name(), &dataset_name);
-                children.push(TreeNode::new(dataset_name, text, vec![])?);
+                children.push(TreeNode::new(dataset_name, text, vec![]));
             }
             let group_name = group.name();
             let text = App::relative_child_name(&parent_name, &group_name);
-            TreeNode::new(group_name, text, children)
+            Ok(TreeNode::new(group_name, text, children))
         }
         // TODO anonymous datasets
         tree_from_group(
@@ -154,7 +155,7 @@ impl App {
             KeyCode::Char('e') => self.tree_state.select(vec!["/variable".to_string()]),
             KeyCode::Char('f') => {
                 // We don't build the root so index is 1 off
-                let mut to_visit = vec![(&self.tree, vec![])];
+                let mut to_visit = vec![(self.tree.get().unwrap(), vec![])];
                 while let Some((current, id_path)) = to_visit.pop() {
                     self.tree_state.open(id_path.clone());
                     to_visit.extend(current.children().iter().map(|c| {

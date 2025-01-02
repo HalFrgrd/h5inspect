@@ -1,8 +1,6 @@
 use fuzzy_matcher::skim::SkimMatcherV2;
 use fuzzy_matcher::FuzzyMatcher;
 
-use std::collections::HashSet;
-
 pub type NodeId = String;
 
 #[derive(Debug, Clone)]
@@ -11,38 +9,24 @@ pub struct TreeNode {
     text: String,
     children: Vec<TreeNode>,
     recursive_num_children: usize,
-    matching_indices: Option<Vec<usize>>,
+    matching_indices: Vec<usize>,
 }
 
 impl TreeNode {
-    pub fn new(
-        id: impl Into<String>,
-        text: String,
-        children: Vec<TreeNode>,
-    ) -> std::io::Result<Self> {
-        // Check for duplicate IDs among children
-        let ids: HashSet<_> = children.iter().map(|child| &child.id).collect();
-
-        if ids.len() != children.len() {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::AlreadyExists,
-                "Children contain duplicate IDs",
-            ));
-        }
-
+    pub fn new(id: impl Into<NodeId>, text: impl Into<String>, children: Vec<TreeNode>) -> Self {
         let recursive_num_children: usize = children
             .iter()
             .map(|child| child.recursive_num_children)
             .sum::<usize>()
             + children.len();
 
-        Ok(Self {
+        Self {
             id: id.into(),
-            text,
+            text: text.into(),
             children,
             recursive_num_children,
-            matching_indices: None,
-        })
+            matching_indices: vec![],
+        }
     }
 
     /// Get a reference to this node's ID
@@ -66,8 +50,8 @@ impl TreeNode {
     }
 
     /// Get a reference to this node's matching indices
-    pub fn matching_indices(&self) -> Option<&Vec<usize>> {
-        self.matching_indices.as_ref()
+    pub fn matching_indices(&self) -> &Vec<usize> {
+        &self.matching_indices
     }
 
     fn ismatch(haystack: &str, needle: &str) -> Option<Vec<usize>> {
@@ -89,20 +73,12 @@ impl TreeNode {
             .filter_map(|child| child.filter(query))
             .collect();
 
-        let recursive_num_children: usize = matching_children
-            .iter()
-            .map(|child| child.recursive_num_children)
-            .sum::<usize>()
-            + matching_children.len();
-
         if i_match || !matching_children.is_empty() {
-            Some(TreeNode {
-                id: self.id.clone(),
-                text: self.text.clone(),
-                children: matching_children,
-                recursive_num_children,
-                matching_indices: indices,
-            })
+            let mut node = TreeNode::new(self.id.clone(), self.text.clone(), matching_children);
+
+            node.matching_indices = indices.unwrap_or(vec![]);
+
+            Some(node)
         } else {
             None
         }
