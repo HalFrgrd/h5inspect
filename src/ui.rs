@@ -11,9 +11,9 @@ use ratatui::{
 use tui_tree_widget::Tree as TreeWidget;
 use tui_tree_widget::TreeItem as TreeItemWidget;
 
-const STYLE_HIGHLIGHT: Style = Style::new().bg(Color::Gray).fg(Color::White);
+const STYLE_HIGHLIGHT: Style = Style::new().fg(Color::White).bg(Color::Gray);
 const STYLE_EXTRA_INFO: Style = Style::new().fg(Color::Gray);
-const STYLE_MATCH: Style = Style::new().fg(Color::Magenta);
+const STYLE_MATCH: Style = Style::new().fg(Color::Magenta).bg(Color::Yellow);
 
 pub fn ui(frame: &mut Frame, app: &mut App) {
     let chunks =
@@ -34,19 +34,20 @@ impl tree::TreeNode {
             .map(|child| child.into_tree_item())
             .collect();
 
-        let mut formatted_text = if let Some(indices) = self.matching_indices() {
-            let mut spans = self
-                .text()
+        let matching_indices = self.matching_indices();
+        let mut formatted_text = Line::from(
+            self.text()
                 .chars()
-                .map(|c| Span::raw(c.to_string()))
-                .collect::<Vec<_>>();
-            for index in indices {
-                spans[*index].style = STYLE_MATCH;
-            }
-            Line::from(spans)
-        } else {
-            Line::from(self.text())
-        };
+                .enumerate()
+                .map(|(i, c)| {
+                    if matching_indices.contains(&i) {
+                        Span::styled(c.to_string(), STYLE_MATCH)
+                    } else {
+                        Span::raw(c.to_string())
+                    }
+                })
+                .collect::<Vec<_>>(),
+        );
 
         let num_children = self.recursive_num_children();
         if num_children > 0 {
@@ -106,7 +107,7 @@ fn render_tree(frame: &mut Frame, app: &mut App, area: Rect) {
         .border_type(BorderType::Rounded);
 
     let query = &app.search_query_and_cursor().0;
-    match app.tree.filter(query) {
+    match app.tree.get().unwrap().filter(query) {
         Some(filtered_tree) => {
             let filtered_items = filtered_tree.into_tree_item();
             // Use root's children instead of root
