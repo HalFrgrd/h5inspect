@@ -4,6 +4,7 @@ use crossterm::event::{MouseButton, MouseEventKind};
 use ratatui::layout::Position;
 use ratatui::{
     crossterm::event::{self, Event, KeyCode},
+    text::Span,
     DefaultTerminal,
 };
 use std::io;
@@ -11,7 +12,7 @@ use std::path::PathBuf;
 
 pub struct App {
     pub h5_file_path: PathBuf,
-    h5_file: hdf5::File,
+    pub h5_file: hdf5::File,
     pub tree_state: tui_tree_widget::TreeState<String>,
     pub tree: TreeNode,
     pub search_query_left: String,
@@ -26,52 +27,29 @@ pub enum Mode {
 
 impl App {
     pub fn new(h5_file_path: PathBuf) -> App {
-        // let items = vec![
-        //     TreeItem::new_leaf("leaf_1_id".to_string(), "leaf_1".to_string()),
-        //     TreeItem::new_leaf("leaf_2_id".to_string(), "leaf_2".to_string()),
-        //     TreeItem::new(
-        //         "asd_id".to_string(),
-        //         "asd".to_string(),
-        //         [
-        //             TreeItem::new_leaf("leaf_3_id".to_string(), "leaf_3".to_string()),
-        //             TreeItem::new_leaf("leaf_4_id".to_string(), "leaf_4".to_string()),
-        //         ]
-        //         .to_vec(),
-        //     )
-        //     .unwrap(),
-        //     TreeItem::new(
-        //         "no_child_id".to_string(),
-        //         "no children".to_string(),
-        //         Vec::new(),
-        //     )
-        //     .unwrap(),
-        // ];
-
-        let h5_file = hdf5::File::open(&h5_file_path).expect("Couldn't open h5 file");
         let mut app = App {
-            h5_file,
-            h5_file_path,
+            h5_file_path: h5_file_path.clone(),
+            h5_file: hdf5::File::open(h5_file_path).expect("Couldn't open h5 file"),
             tree_state: tui_tree_widget::TreeState::default(),
-            tree: TreeNode::new("emptytree", "empty tree", vec![])
+            tree: TreeNode::new("emptytree", "empty tree".to_string(), vec![])
                 .expect("Failed to create root node"),
             search_query_left: String::new(),
             search_query_right: String::new(),
             mode: Mode::Normal,
         };
-        app.tree = app.tree_from_h5().expect("Failed to parse HDF5 structure");
+        let tree = app.tree_from_h5().expect("Failed to parse HDF5 structure");
+        app.tree = tree;
         app
     }
 
-    fn relative_child_name<'b>(parent: &str, child: &'b str) -> &'b str {
+    fn relative_child_name(parent: &str, child: &str) -> String {
         let x = child.strip_prefix(parent).unwrap();
-        x.strip_prefix("/").unwrap_or(x)
+        x.strip_prefix("/").unwrap_or(x).to_string()
     }
 
     fn tree_from_group(parent_name: &str, group: hdf5::Group) -> Result<TreeNode, std::io::Error> {
         // TODO: avoid circular walks
         let mut children = Vec::new();
-
-        let text = App::relative_child_name(&parent_name, &group.name()).to_string();
 
         // The identifier for each TreeNode is the unmodified hdf5 group/dataset name.
         // The name is the full path inside the hdf5 file.
@@ -81,13 +59,13 @@ impl App {
             children.push(App::tree_from_group(&group.name(), child)?);
         }
         for dataset in group.datasets().unwrap_or(vec![]) {
-            children.push(TreeNode::new(
-                dataset.name(),
-                App::relative_child_name(&group.name(), &dataset.name()).to_string(),
-                vec![],
-            )?);
+            let dataset_name = dataset.name();
+            let text = App::relative_child_name(&group.name(), &dataset_name);
+            children.push(TreeNode::new(dataset_name, text, vec![])?);
         }
-        TreeNode::new(group.name(), text, children)
+        let group_name = group.name();
+        let text = App::relative_child_name(&parent_name, &group_name);
+        TreeNode::new(group_name, text, children)
     }
 
     fn tree_from_h5(&self) -> Result<TreeNode, std::io::Error> {

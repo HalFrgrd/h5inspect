@@ -7,6 +7,8 @@ use ratatui::{
 };
 use tui_tree_widget::Tree;
 
+const STYLE_HIGHLIGHT: Style = Style::new().bg(Color::Red).fg(Color::White);
+
 pub fn ui(frame: &mut Frame, app: &mut App) {
     let chunks =
         Layout::horizontal([Constraint::Length(40), Constraint::Min(0)]).split(frame.area());
@@ -73,7 +75,7 @@ fn render_tree(frame: &mut Frame, app: &mut App, area: Rect) {
             let items = filtered_items.children();
             let tree_widget = Tree::new(items)
                 .expect("all item identifiers are unique")
-                .highlight_style(Style::new().fg(Color::Black).bg(Color::Blue))
+                .highlight_style(STYLE_HIGHLIGHT)
                 .block(tree_block);
 
             // println!("selected: {:?}", app.tree_state.selected());
