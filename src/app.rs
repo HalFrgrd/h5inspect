@@ -42,16 +42,13 @@ impl App {
         app
     }
 
-    fn relative_child_name(parent: &str, child: &str) -> String {
+    fn relative_child_name<'a>(parent: &str, child: &'a str) -> &'a str {
         let x = child.strip_prefix(parent).unwrap();
-        x.strip_prefix("/").unwrap_or(x).to_string()
+        x.strip_prefix("/").unwrap_or(x)
     }
 
     fn tree_from_h5(&self) -> Result<TreeNode, std::io::Error> {
-        fn tree_from_group(
-            parent_name: &str,
-            group: hdf5::Group,
-        ) -> Result<TreeNode, std::io::Error> {
+        fn tree_from_group(parent_name: &str, group: hdf5::Group) -> TreeNode {
             // TODO: avoid circular walks
             let mut children = Vec::new();
 
@@ -60,22 +57,20 @@ impl App {
             // This allows us to retrieve the object later
 
             for child in group.groups().unwrap_or(vec![]) {
-                children.push(tree_from_group(&group.name(), child)?);
+                children.push(tree_from_group(&group.name(), child));
             }
             for dataset in group.datasets().unwrap_or(vec![]) {
                 let dataset_name = dataset.name();
-                let text = App::relative_child_name(&group.name(), &dataset_name);
+                let text = App::relative_child_name(&group.name(), &dataset_name).to_string();
                 children.push(TreeNode::new(dataset_name, text, vec![]));
             }
-            let group_name = group.name();
-            let text = App::relative_child_name(&parent_name, &group_name);
-            Ok(TreeNode::new(group_name, text, children))
+            let text = App::relative_child_name(&parent_name, &group.name()).to_string();
+            TreeNode::new(group.name(), text, children)
         }
         // TODO anonymous datasets
-        tree_from_group(
-            "/",
-            self.h5_file.group("/").expect("Couldn't open root group"),
-        )
+
+        let root_group = self.h5_file.group("/").expect("Couldn't open root group");
+        Ok(tree_from_group("/", root_group))
     }
 
     pub fn get_text_for(&self, path_to_object: &str) -> String {
