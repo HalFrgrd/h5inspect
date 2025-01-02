@@ -1,13 +1,19 @@
 use crate::app::{App, Mode};
+use crate::tree;
+use ratatui::text::Line;
+use ratatui::text::Span;
 use ratatui::{
     layout::{Constraint, Layout, Position, Rect},
     style::{Color, Style},
     widgets::{Block, BorderType, Borders, Paragraph, Wrap},
     Frame,
 };
-use tui_tree_widget::Tree;
+use tui_tree_widget::Tree as TreeWidget;
+use tui_tree_widget::TreeItem as TreeItemWidget;
 
-const STYLE_HIGHLIGHT: Style = Style::new().bg(Color::Red).fg(Color::White);
+const STYLE_HIGHLIGHT: Style = Style::new().bg(Color::Gray).fg(Color::White);
+const STYLE_EXTRA_INFO: Style = Style::new().fg(Color::Gray);
+const STYLE_MATCH: Style = Style::new().fg(Color::Magenta);
 
 pub fn ui(frame: &mut Frame, app: &mut App) {
     let chunks =
@@ -19,6 +25,40 @@ pub fn ui(frame: &mut Frame, app: &mut App) {
     render_search(frame, app, left_layout[1]);
     render_tree(frame, app, left_layout[0]);
     render_object_info(frame, app, chunks[1]);
+}
+impl tree::TreeNode {
+    pub fn into_tree_item(&self) -> TreeItemWidget<tree::NodeId> {
+        let children: Vec<_> = self
+            .children()
+            .iter()
+            .map(|child| child.into_tree_item())
+            .collect();
+
+        let mut formatted_text = if let Some(indices) = self.matching_indices() {
+            let mut spans = self
+                .text()
+                .chars()
+                .map(|c| Span::raw(c.to_string()))
+                .collect::<Vec<_>>();
+            for index in indices {
+                spans[*index].style = STYLE_MATCH;
+            }
+            Line::from(spans)
+        } else {
+            Line::from(self.text())
+        };
+
+        let num_children = self.recursive_num_children();
+        if num_children > 0 {
+            formatted_text.push_span(Span::styled(
+                format!(" ({})", num_children),
+                STYLE_EXTRA_INFO,
+            ));
+        }
+
+        TreeItemWidget::new(self.id().to_owned(), formatted_text, children)
+            .expect("Already checked for duplicate IDs")
+    }
 }
 
 fn render_object_info(frame: &mut Frame, app: &mut App, area: Rect) {
@@ -73,7 +113,7 @@ fn render_tree(frame: &mut Frame, app: &mut App, area: Rect) {
             // app.tree_state.select(vec!["group1".to_string()]);
 
             let items = filtered_items.children();
-            let tree_widget = Tree::new(items)
+            let tree_widget = TreeWidget::new(items)
                 .expect("all item identifiers are unique")
                 .highlight_style(STYLE_HIGHLIGHT)
                 .block(tree_block);
