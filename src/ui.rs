@@ -8,8 +8,8 @@ use ratatui::{
     widgets::{Block, BorderType, Borders, Paragraph, Wrap},
     Frame,
 };
-use tui_tree_widget::Tree as TreeWidget;
-use tui_tree_widget::TreeItem as TreeItemWidget;
+use tui_tree_widget::Tree as WidgetTreeRoot;
+use tui_tree_widget::TreeItem as WidgetTreeItem;
 
 const STYLE_HIGHLIGHT: Style = Style::new().fg(Color::White).bg(Color::Gray);
 const STYLE_EXTRA_INFO: Style = Style::new().fg(Color::Gray);
@@ -27,7 +27,7 @@ pub fn ui(frame: &mut Frame, app: &mut App) {
     render_object_info(frame, app, chunks[1]);
 }
 impl tree::TreeNode {
-    pub fn into_tree_item(&self) -> TreeItemWidget<tree::NodeId> {
+    pub fn into_tree_item(&self) -> WidgetTreeItem<tree::NodeId> {
         let children: Vec<_> = self
             .children()
             .iter()
@@ -57,7 +57,7 @@ impl tree::TreeNode {
             ));
         }
 
-        TreeItemWidget::new(self.id().to_owned(), formatted_text, children)
+        WidgetTreeItem::new(self.id().to_owned(), formatted_text, children)
             .expect("Already checked for duplicate IDs")
     }
 }
@@ -114,7 +114,7 @@ fn render_tree(frame: &mut Frame, app: &mut App, area: Rect) {
             // app.tree_state.select(vec!["group1".to_string()]);
 
             let items = filtered_items.children();
-            let tree_widget = TreeWidget::new(items)
+            let tree_widget = WidgetTreeRoot::new(items)
                 .expect("all item identifiers are unique")
                 .highlight_style(STYLE_HIGHLIGHT)
                 .block(tree_block);
