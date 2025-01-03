@@ -1,26 +1,31 @@
 use fuzzy_matcher::skim::SkimMatcherV2;
 use fuzzy_matcher::FuzzyMatcher;
-
-pub type NodeId = String;
+use std::hash::Hash;
 
 #[derive(Debug, Clone)]
-pub struct TreeNode {
-    id: NodeId,
+pub struct TreeNode<IdT>
+where
+    IdT: Eq + Hash + Clone,
+{
+    id: IdT,
     text: String,
-    children: Vec<TreeNode>,
+    children: Vec<TreeNode<IdT>>,
     recursive_num_children: usize,
     matching_indices: Vec<usize>,
 }
 
-impl TreeNode {
-    pub fn new(id: impl Into<NodeId>, text: impl Into<String>, children: Vec<TreeNode>) -> Self {
+impl<IdT> TreeNode<IdT>
+where
+    IdT: Eq + Hash + Clone,
+{
+    pub fn new(id: impl Into<IdT>, text: impl Into<String>, children: Vec<TreeNode<IdT>>) -> Self {
         Self::new_with_indices(id, text, children, vec![])
     }
 
     fn new_with_indices(
-        id: impl Into<NodeId>,
+        id: impl Into<IdT>,
         text: impl Into<String>,
-        children: Vec<TreeNode>,
+        children: Vec<TreeNode<IdT>>,
         indices: Vec<usize>,
     ) -> Self {
         let recursive_num_children: usize = children
@@ -39,8 +44,8 @@ impl TreeNode {
     }
 
     /// Get a reference to this node's ID
-    pub fn id(&self) -> &str {
-        &self.id
+    pub fn id(&self) -> IdT {
+        self.id.clone()
     }
 
     /// Get a reference to this node's text
@@ -49,7 +54,7 @@ impl TreeNode {
     }
 
     /// Get a reference to this node's children
-    pub fn children(&self) -> &[TreeNode] {
+    pub fn children(&self) -> &[TreeNode<IdT>] {
         &self.children
     }
 
@@ -72,7 +77,7 @@ impl TreeNode {
 
     /// Filter this node and its children based on a search query
     /// Returns None if neither this node nor any children match
-    pub fn filter(&self, query: &str) -> Option<TreeNode> {
+    pub fn filter(&self, query: &str) -> Option<TreeNode<IdT>> {
         let indices = Self::ismatch(&self.text, query);
         let i_match = indices.is_some();
 
@@ -94,7 +99,7 @@ impl TreeNode {
         }
     }
 
-    pub fn contains_path(&self, path: &[NodeId]) -> bool {
+    pub fn contains_path(&self, path: &[IdT]) -> bool {
         if path.is_empty() {
             return true;
         }

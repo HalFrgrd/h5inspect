@@ -1,6 +1,7 @@
 //! Create, write, and read a chunked dataset
 
 use hdf5::{File, Result};
+use hdf5_metno as hdf5;
 use ndarray::Array2;
 
 pub fn generate_dummy_file() -> Result<()> {
@@ -47,6 +48,16 @@ pub fn generate_dummy_file() -> Result<()> {
         .shape((ny, nx))
         .create("qweqwe")?;
     group2_d1.write(&arr)?;
+
+    // create a group with 1000 datasets
+    let group3 = file.create_group("group3")?;
+    for i in 0..100 {
+        let dataset = group3
+            .new_dataset::<i32>()
+            .shape((ny, nx))
+            .create(format!("dataset_{}", i).as_str())?;
+        dataset.write(&arr)?;
+    }
 
     Ok(())
 }

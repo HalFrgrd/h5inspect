@@ -11,6 +11,7 @@ use ratatui::{
 use tui_tree_widget::Tree as WidgetTreeRoot;
 use tui_tree_widget::TreeItem as WidgetTreeItem;
 
+use std::hash::Hash;
 const STYLE_HIGHLIGHT: Style = Style::new().fg(Color::White).bg(Color::Gray);
 const STYLE_EXTRA_INFO: Style = Style::new().fg(Color::Gray);
 const STYLE_MATCH: Style = Style::new().fg(Color::Magenta).bg(Color::Yellow);
@@ -26,8 +27,11 @@ pub fn ui(frame: &mut Frame, app: &mut App) {
     render_tree(frame, app, left_layout[0]);
     render_object_info(frame, app, chunks[1]);
 }
-impl tree::TreeNode {
-    pub fn into_tree_item(&self) -> WidgetTreeItem<tree::NodeId> {
+impl<IdT> tree::TreeNode<IdT>
+where
+    IdT: Eq + Hash + Clone,
+{
+    pub fn into_tree_item(&self) -> WidgetTreeItem<IdT> {
         let children: Vec<_> = self
             .children()
             .iter()
@@ -57,7 +61,7 @@ impl tree::TreeNode {
             ));
         }
 
-        WidgetTreeItem::new(self.id().to_owned(), formatted_text, children)
+        WidgetTreeItem::new(self.id(), formatted_text, children)
             .expect("Already checked for duplicate IDs")
     }
 }
@@ -71,7 +75,7 @@ fn render_object_info(frame: &mut Frame, app: &mut App, area: Rect) {
     let mut text = "Select on the left".to_string();
     if !selected.is_empty() {
         // selected is of form: ["/group1", "/group1/dataset1"]
-        text = app.get_text_for(selected.last().unwrap());
+        text = app.get_text_for(selected.last().unwrap().clone());
     }
     let paragraph = Paragraph::new(text).wrap(Wrap { trim: true });
     frame.render_widget(paragraph.clone().block(object_info), area);
@@ -128,7 +132,7 @@ fn render_tree(frame: &mut Frame, app: &mut App, area: Rect) {
             if app.tree_state.selected().is_empty() {
                 app.tree_state.select(vec![items
                     .first()
-                    .map_or("".to_string(), |item| item.identifier().clone())]);
+                    .map_or(0, |item| item.identifier().clone())]);
             }
 
             frame.render_stateful_widget(tree_widget, area, &mut app.tree_state);
