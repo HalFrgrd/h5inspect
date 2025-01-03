@@ -107,7 +107,7 @@ fn render_tree(frame: &mut Frame, app: &mut App, area: Rect) {
         .border_type(BorderType::Rounded);
 
     let query = &app.search_query_and_cursor().0;
-    match app.tree.get().unwrap().filter(query) {
+    match app.tree.filter(query) {
         Some(filtered_tree) => {
             let filtered_items = filtered_tree.into_tree_item();
             // Use root's children instead of root
