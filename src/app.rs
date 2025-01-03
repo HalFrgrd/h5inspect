@@ -14,7 +14,7 @@ pub struct App {
     pub h5_file_path: PathBuf,
     pub h5_file: hdf5::File,
     pub tree_state: tui_tree_widget::TreeState<String>,
-    pub tree: OnceCell<TreeNode>,
+    pub tree: TreeNode,
     pub search_query_left: String,
     pub search_query_right: String,
     pub mode: Mode,
@@ -27,19 +27,17 @@ pub enum Mode {
 
 impl App {
     pub fn new(h5_file_path: PathBuf) -> App {
-        let app = App {
-            h5_file_path: h5_file_path.clone(),
-            h5_file: hdf5::File::open(h5_file_path).expect("Couldn't open h5 file"),
+        let h5_file = hdf5::File::open(h5_file_path.clone()).expect("Couldn't open h5 file");
+        let tree = App::tree_from_h5(&h5_file).expect("Failed to parse HDF5 structure");
+        App {
+            h5_file_path,
+            h5_file,
             tree_state: tui_tree_widget::TreeState::default(),
-            tree: OnceCell::new(),
+            tree,
             search_query_left: String::new(),
             search_query_right: String::new(),
             mode: Mode::Normal,
-        };
-        app.tree
-            .set(app.tree_from_h5().expect("Failed to parse HDF5 structure"))
-            .unwrap();
-        app
+        }
     }
 
     fn relative_child_name<'a>(parent: &str, child: &'a str) -> &'a str {
@@ -47,7 +45,7 @@ impl App {
         x.strip_prefix("/").unwrap_or(x)
     }
 
-    fn tree_from_h5(&self) -> Result<TreeNode, std::io::Error> {
+    fn tree_from_h5(h5_file: &hdf5::File) -> Result<TreeNode, std::io::Error> {
         fn tree_from_group(parent_name: &str, group: hdf5::Group) -> TreeNode {
             // TODO: avoid circular walks
             // The identifier for each TreeNode is the unmodified hdf5 group/dataset name.
@@ -78,7 +76,7 @@ impl App {
         }
         // TODO anonymous datasets
 
-        let root_group = self.h5_file.group("/").expect("Couldn't open root group");
+        let root_group = h5_file.group("/").expect("Couldn't open root group");
         Ok(tree_from_group("/", root_group))
     }
 
@@ -159,7 +157,7 @@ impl App {
             KeyCode::Char('e') => self.tree_state.select(vec!["/variable".to_string()]),
             KeyCode::Char('f') => {
                 // We don't build the root so index is 1 off
-                let mut to_visit = vec![(self.tree.get().unwrap(), vec![])];
+                let mut to_visit = vec![(&self.tree, vec![])];
                 while let Some((current, id_path)) = to_visit.pop() {
                     self.tree_state.open(id_path.clone());
                     to_visit.extend(current.children().iter().map(|c| {
