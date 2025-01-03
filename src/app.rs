@@ -155,19 +155,47 @@ impl App {
         }
     }
 
-    fn on_keypress_normal_mode(&mut self, keycode: KeyCode) {
-        let _ = match keycode {
-            KeyCode::Left => self.tree_state.key_left(),
-            KeyCode::Char('h') => self.tree_state.key_left(),
-            KeyCode::Up => self.tree_state.key_up(),
-            KeyCode::Char('k') => self.tree_state.key_up(),
-            KeyCode::Down => self.tree_state.key_down(),
-            KeyCode::Char('j') => self.tree_state.key_down(),
-            KeyCode::Right => self.tree_state.key_right(),
-            KeyCode::Char('l') => self.tree_state.key_right(),
-            KeyCode::Home => self.tree_state.select_first(),
-            KeyCode::End => self.tree_state.select_last(),
-            KeyCode::Enter => self.tree_state.toggle_selected(),
+    fn on_keypress_normal_mode(&mut self, keycode: KeyCode) -> () {
+        match keycode {
+            KeyCode::Left => {
+                self.tree_state.key_left();
+            }
+            KeyCode::Char('h') => {
+                self.tree_state.key_left();
+            }
+            KeyCode::Up => {
+                self.tree_state.key_up();
+            }
+            KeyCode::Char('k') => {
+                self.tree_state.key_up();
+            }
+            KeyCode::Down => {
+                self.tree_state.key_down();
+            }
+            KeyCode::Char('j') => {
+                self.tree_state.key_down();
+            }
+            KeyCode::Right => {
+                self.tree_state.key_right();
+            }
+            KeyCode::Char('l') => {
+                self.tree_state.key_right();
+            }
+            KeyCode::Home => {
+                self.tree_state.select_first();
+            }
+            KeyCode::End => {
+                self.tree_state.select_last();
+            }
+            KeyCode::Enter => {
+                self.tree_state.toggle_selected();
+            }
+            KeyCode::Tab => {
+                self.on_tab();
+            }
+            KeyCode::BackTab => {
+                self.on_shift_tab();
+            }
             KeyCode::Char('f') => {
                 // We don't build the root so index is 1 off
                 let mut to_visit = vec![(&self.tree, vec![])];
@@ -179,11 +207,9 @@ impl App {
                         (c, id_path)
                     }));
                 }
-                true
             }
-            _ => false,
-        };
-        return;
+            _ => {}
+        }
     }
 
     // TODO does reversing work fine for all utf8 things?
@@ -193,6 +219,16 @@ impl App {
             self.search_query_left.clone() + &rev_right,
             self.search_query_left.len(),
         )
+    }
+
+    fn on_tab(&mut self) -> () {
+        self.tree_state
+            .select_relative(|x| x.map_or(0, |current| current.saturating_add(1)));
+    }
+
+    fn on_shift_tab(&mut self) -> () {
+        self.tree_state
+            .select_relative(|x| x.map_or(0, |current| current.saturating_sub(1)));
     }
 
     fn on_keypress_search_mode(&mut self, keycode: KeyCode) {
@@ -221,6 +257,12 @@ impl App {
             }
             KeyCode::Delete => {
                 self.search_query_right.pop();
+            }
+            KeyCode::Tab => {
+                self.on_tab();
+            }
+            KeyCode::BackTab => {
+                self.on_shift_tab();
             }
             _ => {}
         };
