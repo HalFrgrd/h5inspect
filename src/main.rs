@@ -10,7 +10,7 @@ mod tree;
 mod ui;
 
 fn main() -> Result<(), Box<dyn Error>> {
-    crate::h5_gen::generate_dummy_file()?;
+    // crate::h5_gen::generate_dummy_file()?;
     let matches = Command::new("h5inspect")
         .author("Hal Frigaard")
         .about("Simple TUI to inspect h5 files")
@@ -28,7 +28,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     color_eyre::install()?;
     let terminal = ratatui::init();
-    let _ = App::new(h5_file_path).run(terminal);
+    let app = App::new(h5_file_path);
+    let _ = app.run(terminal);
     ratatui::restore();
 
     Ok(())

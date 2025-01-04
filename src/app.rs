@@ -10,6 +10,9 @@ use ratatui::{
 use std::collections::HashMap;
 use std::io;
 use std::path::PathBuf;
+use std::sync::mpsc;
+use std::thread;
+use std::time::Duration;
 
 // pub type NodeIdT = String;
 pub type NodeIdT = hdf5_metno_sys::h5i::hid_t;
@@ -21,13 +24,13 @@ enum Hdf5Object {
 
 pub struct App {
     pub h5_file_path: PathBuf,
-    pub h5_file: hdf5::File,
     pub tree_state: tui_tree_widget::TreeState<NodeIdT>,
     pub tree: TreeNode<NodeIdT>,
     tree_node_to_object: HashMap<NodeIdT, Hdf5Object>,
     pub search_query_left: String,
     pub search_query_right: String,
     pub mode: Mode,
+    rx: mpsc::Receiver<(TreeNode<NodeIdT>, HashMap<NodeIdT, Hdf5Object>)>,
 }
 
 pub enum Mode {
@@ -38,17 +41,23 @@ pub enum Mode {
 impl App {
     pub fn new(h5_file_path: PathBuf) -> App {
         let h5_file = hdf5::File::open(h5_file_path.clone()).expect("Couldn't open h5 file");
-        let (tree, tree_node_to_object) =
-            App::tree_from_h5(&h5_file).expect("Failed to parse HDF5 structure");
+
+        let (tx, rx) = mpsc::channel();
+        thread::spawn(move || {
+            let (tree, tree_node_to_object) =
+                App::tree_from_h5(&h5_file).expect("Failed to parse HDF5 structure");
+            tx.send((tree, tree_node_to_object)).unwrap();
+        });
+
         App {
             h5_file_path,
-            h5_file,
             tree_state: tui_tree_widget::TreeState::default(),
-            tree,
-            tree_node_to_object,
+            tree: TreeNode::new(0, "Loading...".to_string(), vec![]),
+            tree_node_to_object: HashMap::new(),
             search_query_left: String::new(),
             search_query_right: String::new(),
             mode: Mode::Normal,
+            rx,
         }
     }
 
@@ -270,10 +279,17 @@ impl App {
 
     pub fn run(mut self, mut terminal: DefaultTerminal) -> io::Result<bool> {
         loop {
-            terminal.draw(|f| ui(f, &mut self))?;
+            terminal.draw(|frame| ui(frame, &mut self))?;
 
-            if let Ok(true) = self.handle_events() {
-                return Ok(true);
+            if let Ok(true) = event::poll(Duration::from_millis(20)) {
+                if let Ok(true) = self.handle_events() {
+                    return Ok(true);
+                }
+            }
+
+            if let Ok((tree, tree_node_to_object)) = self.rx.try_recv() {
+                self.tree = tree;
+                self.tree_node_to_object = tree_node_to_object;
             }
         }
     }
@@ -324,10 +340,12 @@ impl App {
     pub fn get_text_for(&self, id: i64) -> String {
         // self.h5_file.group(name)
 
-        let object = self.tree_node_to_object.get(&id).unwrap();
-        match object {
-            Hdf5Object::Dataset(dataset) => App::get_text_for_dataset(dataset),
-            Hdf5Object::Group(group) => App::get_text_for_group(group),
+        match self.tree_node_to_object.get(&id) {
+            Some(object) => match object {
+                Hdf5Object::Dataset(dataset) => App::get_text_for_dataset(dataset),
+                Hdf5Object::Group(group) => App::get_text_for_group(group),
+            },
+            None => "Couldn't find this object".to_string(),
         }
 
         // match unsafe { hdf5::from_id::<hdf5::Dataset>(id) } {
