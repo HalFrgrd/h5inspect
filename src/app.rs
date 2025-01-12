@@ -4,15 +4,14 @@ use crossterm::event::{MouseButton, MouseEventKind};
 use hdf5_metno as hdf5;
 use ratatui::layout::Position;
 use ratatui::{
-    crossterm::event::{self, Event, KeyCode, KeyModifiers},
+    crossterm::event::{KeyCode, KeyModifiers},
     DefaultTerminal,
 };
 use std::collections::HashMap;
-use std::io;
 use std::path::PathBuf;
 use std::sync::mpsc;
 use std::thread;
-use std::time::Duration;
+use crate::events;
 
 // pub type NodeIdT = String;
 pub type NodeIdT = hdf5_metno_sys::h5i::hid_t;
@@ -23,6 +22,7 @@ enum Hdf5Object {
 }
 
 pub struct App {
+    running: bool,
     pub h5_file_path: PathBuf,
     pub tree_state: tui_tree_widget::TreeState<NodeIdT>,
     pub tree: Option<TreeNode<NodeIdT>>,
@@ -31,6 +31,7 @@ pub struct App {
     pub search_query_right: String,
     pub mode: Mode,
     rx: mpsc::Receiver<(TreeNode<NodeIdT>, HashMap<NodeIdT, Hdf5Object>)>,
+    events: events::EventHandler,
 }
 
 pub enum Mode {
@@ -39,7 +40,7 @@ pub enum Mode {
 }
 
 impl App {
-    pub fn new(h5_file_path: PathBuf) -> Result<App, hdf5_metno::Error> {
+    pub fn new(h5_file_path: PathBuf) -> Result<App, Box<dyn std::error::Error>> {
         let h5_file = hdf5::File::open(h5_file_path.clone())?;
 
         let (tx, rx) = mpsc::channel();
@@ -49,7 +50,10 @@ impl App {
             tx.send((tree, tree_node_to_object)).unwrap();
         });
 
+        let events = events::EventHandler::new();
+
         Ok(App {
+            running: true,
             h5_file_path,
             tree_state: tui_tree_widget::TreeState::default(),
             tree: None,
@@ -58,6 +62,7 @@ impl App {
             search_query_right: String::new(),
             mode: Mode::Normal,
             rx,
+            events,
         })
     }
 
@@ -307,62 +312,62 @@ impl App {
         };
     }
 
-    pub fn run(mut self, mut terminal: DefaultTerminal) -> io::Result<bool> {
-        loop {
-            terminal.draw(|frame| ui(frame, &mut self))?;
+    pub async fn run(mut self, mut terminal: DefaultTerminal) -> Result<(), Box<dyn std::error::Error>> {
 
-            if let Ok(true) = event::poll(Duration::from_millis(20)) {
-                if let Ok(true) = self.handle_events() {
-                    return Ok(true);
-                }
+        if let Ok((tree, tree_node_to_object)) = self.rx.recv(){
+            self.tree = Some(tree);
+            self.tree_node_to_object = tree_node_to_object;
+            self.tree_state.open(vec![self.tree.as_ref().unwrap().id()]);
+        }
+
+        while self.running {
+            terminal.draw(|frame| ui(frame, &mut self))?;
+            
+            match self.events.next().await? {
+                events::Event::Tick => {}
+                events::Event::Key(key) => { self.handle_keypress(key) }
+                events::Event::Mouse(mouse) => { self.handle_mouse(mouse) }
+                events::Event::Resize(_, _) => {}
+            }
+        }
+        Ok(())
+    }
+
+    fn handle_keypress(&mut self, key: crossterm::event::KeyEvent) {
+        if key.kind == crossterm::event::KeyEventKind::Press {
+            // if Ctrl+c is pressed, exit
+            if key.code == KeyCode::Char('c') && key.modifiers == KeyModifiers::CONTROL {
+                self.running = false;
             }
 
-            if let Ok((tree, tree_node_to_object)) = self.rx.try_recv() {
-                self.tree = Some(tree);
-                self.tree_node_to_object = tree_node_to_object;
-                self.tree_state.open(vec![self.tree.as_ref().unwrap().id()]);
+            match self.mode {
+                Mode::Normal => match key.code {
+                    KeyCode::Char('q') => {
+                        self.running = false;
+                    }
+                    KeyCode::Char('/') => {
+                        self.mode = Mode::SearchQueryEditing;
+                    }
+                    other => {
+                        self.on_keypress_normal_mode(other);
+                    }
+                },
+                Mode::SearchQueryEditing => match key.code {
+                    KeyCode::Esc | KeyCode::Enter => {
+                        self.mode = Mode::Normal;
+                    }
+                    other => {
+                        self.on_keypress_search_mode(other);
+                    }
+                },
             }
         }
     }
 
-    fn handle_events(&mut self) -> io::Result<bool> {
-        match event::read()? {
-            Event::Key(key) => {
-                if key.kind == event::KeyEventKind::Press {
-                    // if Ctrl+c is pressed, exit
-                    if key.code == KeyCode::Char('c') && key.modifiers == KeyModifiers::CONTROL {
-                        return Ok(true);
-                    }
-
-                    match self.mode {
-                        Mode::Normal => match key.code {
-                            KeyCode::Char('q') => {
-                                return Ok(true);
-                            }
-                            KeyCode::Char('/') => {
-                                self.mode = Mode::SearchQueryEditing;
-                            }
-                            other => {
-                                self.on_keypress_normal_mode(other);
-                            }
-                        },
-                        Mode::SearchQueryEditing => match key.code {
-                            KeyCode::Esc | KeyCode::Enter => {
-                                self.mode = Mode::Normal;
-                            }
-                            other => {
-                                self.on_keypress_search_mode(other);
-                            }
-                        },
-                    }
-                }
-            }
-            Event::Mouse(mouse) => match mouse.kind {
-                MouseEventKind::Down(MouseButton::Left) => self.on_click(mouse.column, mouse.row),
-                _ => {}
-            },
+    fn handle_mouse(&mut self, mouse: crossterm::event::MouseEvent) {
+        match mouse.kind {
+            MouseEventKind::Down(MouseButton::Left) => self.on_click(mouse.column, mouse.row),
             _ => {}
         }
-        return Ok(false);
     }
 }

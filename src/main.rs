@@ -4,13 +4,15 @@ use color_eyre::Result;
 use std::error::Error;
 
 mod app;
+mod events;
 mod h5_gen;
 mod h5_utils;
 mod tree;
 mod ui;
 
-fn main() -> Result<(), Box<dyn Error>> {
-    // crate::h5_gen::generate_dummy_file()?;
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn Error>> {
+    crate::h5_gen::generate_dummy_file()?;
     let matches = Command::new("h5inspect")
         .author("Hal Frigaard")
         .about("Simple TUI to inspect h5 files")
@@ -29,8 +31,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     color_eyre::install()?;
     let terminal = ratatui::init();
     let app = App::new(h5_file_path)?;
-    let _ = app.run(terminal);
-    ratatui::restore();
+    let _ = app.run(terminal).await;
 
+    ratatui::restore();
     Ok(())
 }
