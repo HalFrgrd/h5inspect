@@ -25,7 +25,7 @@ enum Hdf5Object {
 pub struct App {
     pub h5_file_path: PathBuf,
     pub tree_state: tui_tree_widget::TreeState<NodeIdT>,
-    pub tree: TreeNode<NodeIdT>,
+    pub tree: Option<TreeNode<NodeIdT>>,
     tree_node_to_object: HashMap<NodeIdT, Hdf5Object>,
     pub search_query_left: String,
     pub search_query_right: String,
@@ -52,7 +52,7 @@ impl App {
         App {
             h5_file_path,
             tree_state: tui_tree_widget::TreeState::default(),
-            tree: TreeNode::new(0, "Loading...".to_string(), vec![]),
+            tree: None,
             tree_node_to_object: HashMap::new(),
             search_query_left: String::new(),
             search_query_right: String::new(),
@@ -154,8 +154,20 @@ impl App {
         )
     }
 
+    pub fn get_text_for(&self, id: NodeIdT) -> String {
+        match self.tree_node_to_object.get(&id) {
+            Some(object) => match object {
+                Hdf5Object::Dataset(dataset) => App::get_text_for_dataset(dataset),
+                Hdf5Object::Group(group) => App::get_text_for_group(group),
+            },
+            None => format!("Couldn't find object with id {}", id),
+        }
+    }
+
     fn on_click(&mut self, column: u16, row: u16) {
         let position = Position::new(column, row);
+
+        dbg!(&position);
 
         if let Some(id) = self.tree_state.rendered_at(position) {
             let arg = id.to_vec();
@@ -206,15 +218,16 @@ impl App {
                 self.on_shift_tab();
             }
             KeyCode::Char('f') => {
-                // We don't build the root so index is 1 off
-                let mut to_visit = vec![(&self.tree, vec![])];
-                while let Some((current, id_path)) = to_visit.pop() {
-                    self.tree_state.open(id_path.clone());
-                    to_visit.extend(current.children().iter().map(|c| {
-                        let mut id_path = id_path.clone();
-                        id_path.push(c.id());
-                        (c, id_path)
-                    }));
+                if let Some(tree) = &self.tree {
+                    let mut to_visit = vec![(tree, vec![tree.id()])];
+                    while let Some((current, id_path)) = to_visit.pop() {
+                        self.tree_state.open(id_path.clone());
+                        to_visit.extend(current.children().iter().map(|c| {
+                            let mut id_path = id_path.clone();
+                            id_path.push(c.id());
+                            (c, id_path)
+                        }));
+                    }
                 }
             }
             _ => {}
@@ -288,8 +301,9 @@ impl App {
             }
 
             if let Ok((tree, tree_node_to_object)) = self.rx.try_recv() {
-                self.tree = tree;
+                self.tree = Some(tree);
                 self.tree_node_to_object = tree_node_to_object;
+                self.tree_state.open(vec![self.tree.as_ref().unwrap().id()]);
             }
         }
     }
@@ -334,52 +348,4 @@ impl App {
         }
         return Ok(false);
     }
-}
-
-impl App {
-    pub fn get_text_for(&self, id: i64) -> String {
-        // self.h5_file.group(name)
-
-        match self.tree_node_to_object.get(&id) {
-            Some(object) => match object {
-                Hdf5Object::Dataset(dataset) => App::get_text_for_dataset(dataset),
-                Hdf5Object::Group(group) => App::get_text_for_group(group),
-            },
-            None => "Couldn't find this object".to_string(),
-        }
-
-        // match unsafe { hdf5::from_id::<hdf5::Dataset>(id) } {
-        //     Ok(dataset) => App::get_text_for_dataset(&dataset),
-        //     Err(_) => match unsafe { hdf5::from_id::<hdf5::Group>(id) } {
-        //         Ok(group) => App::get_text_for_group(&group),
-        //         Err(_) => {
-        //             let asd = self.h5_file.group("/group1").unwrap();
-        //             let text = if let Ok(group_from_id) = unsafe { hdf5::from_id::<hdf5::Group>(asd.id()) } {
-        //                 App::get_text_for_group(&group_from_id)
-        //             } else {
-        //                 "asd".to_string()
-        //             };
-        //             let extra = self.some_group.id();
-        //             format!("{}\nGroup id: {}", text, extra)
-        //         },
-        //     },
-        // }
-    }
-    // pub fn get_text_for(&self, path_to_object: &str) -> String {
-    //     match self.h5_file.dataset(path_to_object) {
-    //         Ok(dataset) => App::get_text_for_dataset(&dataset),
-    //         Err(_) => match self.h5_file.group(path_to_object) {
-    //             Ok(group) => {
-    //                 let text = if let Ok(group_from_id) = unsafe { hdf5::from_id::<hdf5::Group>(group.id()) } {
-    //                     App::get_text_for_group(&group_from_id)
-    //                 } else {
-    //                     "asd".to_string()
-    //                 };
-    //                 let extra = group.id();
-    //                 format!("{}\nGroup id: {}", text, extra)
-    //             }
-    //             Err(_) => format!("what is this? {:?}", path_to_object),
-    //         },
-    //     }
-    // }
 }
