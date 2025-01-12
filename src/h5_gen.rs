@@ -52,7 +52,7 @@ pub fn generate_dummy_file() -> Result<()> {
 
     // create a group with 1000 datasets
     let group3 = file.create_group("group3")?;
-    for i in 0..500 {
+    for i in 0..2000 {
         let dataset = group3
             .new_dataset::<i32>()
             .shape((ny, nx))

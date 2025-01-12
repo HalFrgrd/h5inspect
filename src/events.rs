@@ -9,14 +9,15 @@ pub enum Event {
     Key(KeyEvent),
     Mouse(MouseEvent),
     Tick,
-    Resize(u16, u16),
+    Resize,
+    // TreeUpdate(tree::Tree<tree::NodeIdT>, app::TreeNodeToObject),
 }
 
 #[allow(dead_code)]
 #[derive(Debug)]
 pub struct EventHandler {
     sender: mpsc::UnboundedSender<Event>,
-    receiver: mpsc::UnboundedReceiver<Event>,
+    pub receiver: mpsc::UnboundedReceiver<Event>,
     handler: tokio::task::JoinHandle<()>,
 }
 
@@ -46,8 +47,8 @@ impl EventHandler {
                             CrosstermEvent::Mouse(mouse) => {
                                 sender_clone.send(Event::Mouse(mouse)).unwrap();
                             }
-                            CrosstermEvent::Resize(x, y) => {
-                                sender_clone.send(Event::Resize(x, y)).unwrap();
+                            CrosstermEvent::Resize(_, _) => {
+                                sender_clone.send(Event::Resize).unwrap();
                             }
                             CrosstermEvent::FocusLost => {}
                             CrosstermEvent::FocusGained => {}
@@ -64,13 +65,13 @@ impl EventHandler {
         }
     }
 
-    pub async fn next(&mut self) -> Result<Event, Box<dyn std::error::Error>> {
-        self.receiver
-            .recv()
-            .await
-            .ok_or(Box::new(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                "IO error",
-            )))
-    }
+    // pub async fn next(&mut self) -> Result<Event, Box<dyn std::error::Error>> {
+    //     self.receiver
+    //         .recv()
+    //         .await
+    //         .ok_or(Box::new(std::io::Error::new(
+    //             std::io::ErrorKind::Other,
+    //             "IO error",
+    //         )))
+    // }
 }

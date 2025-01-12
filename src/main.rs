@@ -10,9 +10,9 @@ mod h5_utils;
 mod tree;
 mod ui;
 
-#[tokio::main]
+#[tokio::main(flavor = "multi_thread", worker_threads = 10)]
 async fn main() -> Result<(), Box<dyn Error>> {
-    crate::h5_gen::generate_dummy_file()?;
+    // crate::h5_gen::generate_dummy_file()?;
     let matches = Command::new("h5inspect")
         .author("Hal Frigaard")
         .about("Simple TUI to inspect h5 files")

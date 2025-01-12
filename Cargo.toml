@@ -18,3 +18,5 @@ serde_json = "1.0.134"
 tokio = { version = "1.43.0", features = ["full"] }
 tui-tree-widget = "0.23.0"
 
+[profile.release]
+debug = true

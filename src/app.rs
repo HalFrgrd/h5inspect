@@ -10,28 +10,28 @@ use ratatui::{
 };
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::sync::mpsc;
-use std::thread;
-
-// pub type NodeIdT = String;
-pub type NodeIdT = hdf5_metno_sys::h5i::hid_t;
+// use std::sync::mpsc;
+// use std::thread;
 
 enum Hdf5Object {
     Group(hdf5::Group),
     Dataset(hdf5::Dataset),
 }
 
+// pub type NodeIdT = String;
+pub type NodeIdT = hdf5_metno_sys::h5i::hid_t;
+type TreeNodeToObject = HashMap<NodeIdT, Hdf5Object>;
+
 pub struct App {
     running: bool,
     pub h5_file_path: PathBuf,
     pub tree_state: tui_tree_widget::TreeState<NodeIdT>,
     pub tree: Option<TreeNode<NodeIdT>>,
-    tree_node_to_object: HashMap<NodeIdT, Hdf5Object>,
+    tree_node_to_object: TreeNodeToObject,
     pub search_query_left: String,
     pub search_query_right: String,
     pub mode: Mode,
-    rx: mpsc::Receiver<(TreeNode<NodeIdT>, HashMap<NodeIdT, Hdf5Object>)>,
-    events: events::EventHandler,
+    rx: tokio::sync::mpsc::Receiver<(TreeNode<NodeIdT>, TreeNodeToObject)>,
 }
 
 pub enum Mode {
@@ -41,16 +41,16 @@ pub enum Mode {
 
 impl App {
     pub fn new(h5_file_path: PathBuf) -> Result<App, Box<dyn std::error::Error>> {
-        let h5_file = hdf5::File::open(h5_file_path.clone())?;
+        let h5_file = hdf5::File::with_options()
+            .with_fapl(|p| p.sec2())
+            .open(h5_file_path.clone())?;
 
-        let (tx, rx) = mpsc::channel();
-        thread::spawn(move || {
+        let (tx, rx) = tokio::sync::mpsc::channel(1);
+        tokio::spawn(async move {
             let (tree, tree_node_to_object) =
                 App::tree_from_h5(&h5_file).expect("Failed to parse HDF5 structure");
-            tx.send((tree, tree_node_to_object)).unwrap();
+            tx.send((tree, tree_node_to_object)).await.unwrap();
         });
-
-        let events = events::EventHandler::new();
 
         Ok(App {
             running: true,
@@ -62,7 +62,6 @@ impl App {
             search_query_right: String::new(),
             mode: Mode::Normal,
             rx,
-            events,
         })
     }
 
@@ -87,25 +86,28 @@ impl App {
             // The name is the full path inside the hdf5 file.
             // This allows us to retrieve the object later
 
+            let group_name = group.name();
+
             let mut children: Vec<_> = group
                 .groups()
                 .unwrap_or(vec![])
                 .into_iter()
-                .map(|child| tree_from_group(&group.name(), child, tree_node_to_object))
+                .map(|child| tree_from_group(&group_name, child, tree_node_to_object))
                 .collect();
 
             let datasets = group.datasets().unwrap_or(vec![]);
 
             for dataset in datasets {
+                // let dataset_name = group_name.clone() + "/asd" + &dataset_idx.to_string();
                 let dataset_name = dataset.name();
-                let text = App::relative_child_name(&group.name(), &dataset_name);
+                let text = App::relative_child_name(&group_name, &dataset_name);
                 let node_id = dataset.id();
-                tree_node_to_object.insert(node_id, Hdf5Object::Dataset(dataset));
+                tree_node_to_object.insert(node_id, Hdf5Object::Dataset(dataset.clone()));
                 children.push(TreeNode::new(node_id, text, vec![]));
             }
 
             let group_id = group.id();
-            let text = App::relative_child_name(&parent_name, &group.name()).to_string();
+            let text = App::relative_child_name(&parent_name, &group_name).to_string();
             tree_node_to_object.insert(group_id, Hdf5Object::Group(group));
             TreeNode::new(group_id, text, children)
         }
@@ -316,20 +318,25 @@ impl App {
         mut self,
         mut terminal: DefaultTerminal,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        if let Ok((tree, tree_node_to_object)) = self.rx.recv() {
-            self.tree = Some(tree);
-            self.tree_node_to_object = tree_node_to_object;
-            self.tree_state.open(vec![self.tree.as_ref().unwrap().id()]);
-        }
+        let mut events = events::EventHandler::new();
 
         while self.running {
             terminal.draw(|frame| ui(frame, &mut self))?;
 
-            match self.events.next().await? {
-                events::Event::Tick => {}
-                events::Event::Key(key) => self.handle_keypress(key),
-                events::Event::Mouse(mouse) => self.handle_mouse(mouse),
-                events::Event::Resize(_, _) => {}
+            tokio::select! {
+                Some(event) = events.receiver.recv() => {
+                    match event {
+                        events::Event::Tick => {}
+                        events::Event::Key(key) => self.handle_keypress(key),
+                        events::Event::Mouse(mouse) => self.handle_mouse(mouse),
+                        events::Event::Resize => {}
+                    }
+                }
+                Some((tree, tree_node_to_object)) = self.rx.recv() => {
+                    self.tree = Some(tree);
+                    self.tree_node_to_object = tree_node_to_object;
+                    self.tree_state.open(vec![self.tree.as_ref().unwrap().id()]);
+                }
             }
         }
         Ok(())
