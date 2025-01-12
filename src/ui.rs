@@ -1,5 +1,6 @@
 use crate::app::{App, Mode};
 use crate::tree;
+use log::*;
 use ratatui::text::Line;
 use ratatui::text::Span;
 use ratatui::{
@@ -39,7 +40,7 @@ pub fn ui(frame: &mut Frame, app: &mut App) {
 }
 impl<IdT> tree::TreeNode<IdT>
 where
-    IdT: Eq + Hash + Clone,
+    IdT: Eq + Hash + Clone + std::fmt::Debug,
 {
     pub fn into_tree_item(&self) -> WidgetTreeItem<IdT> {
         let children: Vec<_> = self
@@ -116,7 +117,12 @@ fn render_search(frame: &mut Frame, app: &mut App, area: Rect) {
 
 fn render_tree(frame: &mut Frame, app: &mut App, area: Rect) {
     let tree_block = Block::new()
-        .title(app.h5_file_path.to_str().unwrap_or("unknown file"))
+        .title(
+            app.h5_file_path
+                .to_str()
+                .unwrap_or("unknown file")
+                .to_string(),
+        )
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded);
 
@@ -126,28 +132,20 @@ fn render_tree(frame: &mut Frame, app: &mut App, area: Rect) {
         Some(tree) => {
             match tree.filter(query) {
                 Some(filtered_tree) => {
-                    let filtered_items = filtered_tree.into_tree_item();
-                    // Use root's children instead of root
-                    // app.tree_state.select(vec!["group1".to_string()]);
+                    let filtered_items = [filtered_tree.into_tree_item()];
 
-                    // let items = filtered_items.children();
-                    let items = vec![filtered_items];
-                    let tree_widget = WidgetTreeRoot::new(&items)
+                    let tree_widget = WidgetTreeRoot::new(&filtered_items)
                         .expect("all item identifiers are unique")
                         .highlight_style(STYLE_HIGHLIGHT)
                         .block(tree_block);
 
                     // println!("selected: {:?}", app.tree_state.selected());
 
-                    // if !filtered_tree.contains_path(&app.tree_state.selected()) {
-                    //     app.tree_state.select(vec![]);
-                    // }
+                    // debug!("selected: {:?}", app.tree_state.selected());
+                    // debug!("filtered tree contains path: {:?}", filtered_tree.contains_path(&app.tree_state.selected()));
+                    // debug!("filtered_tree: {:?}", filtered_tree);
 
-                    // if app.tree_state.selected().is_empty() {
-                    //     app.tree_state.select(vec![items
-                    //         .first()
-                    //         .map_or(0, |item| item.identifier().clone())]);
-                    // }
+                    app.update_selected_tree_item(&filtered_tree);
 
                     frame.render_stateful_widget(tree_widget, area, &mut app.tree_state);
                 }

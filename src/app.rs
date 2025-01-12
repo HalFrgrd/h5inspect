@@ -65,7 +65,7 @@ impl App {
             search_query_right: String::new(),
             mode: Mode::Normal,
             rx,
-            show_logs: false,
+            show_logs: true,
         })
     }
 
@@ -387,6 +387,17 @@ impl App {
         match mouse.kind {
             MouseEventKind::Down(MouseButton::Left) => self.on_click(mouse.column, mouse.row),
             _ => {}
+        }
+    }
+
+    pub fn update_selected_tree_item(&mut self, tree: &TreeNode<NodeIdT>) {
+        let nothing_selected = self.tree_state.selected().is_empty();
+        let selected_item = tree.get_selected_node(&self.tree_state.selected());
+        let selected_item_is_in_tree = selected_item.is_some();
+        let selected_item_is_direct_match = selected_item.map_or(false, |t| t.is_direct_match);
+
+        if nothing_selected || !selected_item_is_in_tree || !selected_item_is_direct_match {
+            self.tree_state.select(tree.path_to_first_match());
         }
     }
 }

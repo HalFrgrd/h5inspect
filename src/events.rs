@@ -23,7 +23,7 @@ pub struct EventHandler {
 
 impl EventHandler {
     pub fn new() -> Self {
-        let tick_rate = Duration::from_millis(250);
+        let tick_rate = Duration::from_millis(800);
         let (sender, receiver) = mpsc::unbounded_channel();
         let sender_clone = sender.clone();
         let handler = tokio::spawn(async move {
