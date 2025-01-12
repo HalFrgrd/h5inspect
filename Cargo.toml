@@ -14,11 +14,6 @@ hdf5-metno-sys = "0.10.0"
 log = "0.4.22"
 ndarray = "0.16.1"
 ratatui = "0.29.0"
-serde = { version = "1.0.216", features = ["derive"] }
-serde_json = "1.0.134"
 tokio = { version = "1.43.0", features = ["full"] }
 tui-logger = "0.14.1"
 tui-tree-widget = "0.23.0"
-
-[profile.release]
-debug = true
