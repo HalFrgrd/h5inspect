@@ -1,6 +1,5 @@
 use crate::app::{App, Mode};
 use crate::tree;
-use log::*;
 use ratatui::text::Line;
 use ratatui::text::Span;
 use ratatui::{
@@ -126,40 +125,28 @@ fn render_tree(frame: &mut Frame, app: &mut App, area: Rect) {
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded);
 
-    let query = &app.search_query_and_cursor().0;
-
     match &app.tree {
-        Some(tree) => {
-            match tree.filter(query) {
-                Some(filtered_tree) => {
-                    let filtered_items = [filtered_tree.into_tree_item()];
+        Some(_) => match &app.filtered_tree {
+            Some(filtered_tree) => {
+                let filtered_items = [filtered_tree.into_tree_item()];
 
-                    let tree_widget = WidgetTreeRoot::new(&filtered_items)
-                        .expect("all item identifiers are unique")
-                        .highlight_style(STYLE_HIGHLIGHT)
-                        .block(tree_block);
+                let tree_widget = WidgetTreeRoot::new(&filtered_items)
+                    .expect("all item identifiers are unique")
+                    .highlight_style(STYLE_HIGHLIGHT)
+                    .block(tree_block);
 
-                    // println!("selected: {:?}", app.tree_state.selected());
-
-                    // debug!("selected: {:?}", app.tree_state.selected());
-                    // debug!("filtered tree contains path: {:?}", filtered_tree.contains_path(&app.tree_state.selected()));
-                    // debug!("filtered_tree: {:?}", filtered_tree);
-
-                    app.update_selected_tree_item(&filtered_tree);
-
-                    frame.render_stateful_widget(tree_widget, area, &mut app.tree_state);
-                }
-                None => {
-                    frame.render_widget(
-                        Paragraph::new("No matches found")
-                            .centered()
-                            .block(tree_block)
-                            .style(Style::default().bg(Color::Red)),
-                        area,
-                    );
-                }
+                frame.render_stateful_widget(tree_widget, area, &mut app.tree_state);
             }
-        }
+            None => {
+                frame.render_widget(
+                    Paragraph::new("No matches found")
+                        .centered()
+                        .block(tree_block)
+                        .style(Style::default().bg(Color::Red)),
+                    area,
+                );
+            }
+        },
         None => {
             frame.render_widget(
                 Paragraph::new("Loading tree...")

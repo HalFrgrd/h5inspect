@@ -29,6 +29,7 @@ pub struct App {
     pub h5_file_path: PathBuf,
     pub tree_state: tui_tree_widget::TreeState<NodeIdT>,
     pub tree: Option<TreeNode<NodeIdT>>,
+    pub filtered_tree: Option<TreeNode<NodeIdT>>,
     tree_node_to_object: TreeNodeToObject,
     pub search_query_left: String,
     pub search_query_right: String,
@@ -60,12 +61,13 @@ impl App {
             h5_file_path,
             tree_state: tui_tree_widget::TreeState::default(),
             tree: None,
+            filtered_tree: None,
             tree_node_to_object: HashMap::new(),
             search_query_left: String::new(),
             search_query_right: String::new(),
             mode: Mode::Normal,
             rx,
-            show_logs: true,
+            show_logs: cfg!(debug_assertions),
         })
     }
 
@@ -322,6 +324,37 @@ impl App {
             }
             _ => {}
         };
+        self.update_filtered_tree();
+    }
+
+    fn update_filtered_tree(&mut self) {
+        let query = &self.search_query_and_cursor().0;
+        match &self.tree {
+            Some(tree) => {
+                self.filtered_tree = tree.filter(query);
+                self.update_selected_tree_item();
+            }
+            None => {
+                self.filtered_tree = None;
+            }
+        }
+    }
+
+    fn update_selected_tree_item(&mut self) {
+        if let Some(filtered_tree) = &self.filtered_tree {
+            let nothing_selected = self.tree_state.selected().is_empty();
+            let selected_item = filtered_tree.get_selected_node(&self.tree_state.selected());
+            let selected_item_is_in_tree = selected_item.is_some();
+            let selected_item_is_direct_match = selected_item.map_or(false, |t| t.is_direct_match);
+
+            if nothing_selected || !selected_item_is_in_tree || !selected_item_is_direct_match {
+                let first_match = filtered_tree.path_to_first_match();
+                self.tree_state.select(first_match.clone());
+                for i in 0..first_match.len() {
+                    self.tree_state.open(first_match[0..i].to_vec());
+                }
+            }
+        }
     }
 
     pub async fn run(
@@ -346,6 +379,7 @@ impl App {
                     self.tree = Some(tree);
                     self.tree_node_to_object = tree_node_to_object;
                     self.tree_state.open(vec![self.tree.as_ref().unwrap().id()]);
+                    self.update_filtered_tree();
                 }
             }
         }
@@ -387,17 +421,6 @@ impl App {
         match mouse.kind {
             MouseEventKind::Down(MouseButton::Left) => self.on_click(mouse.column, mouse.row),
             _ => {}
-        }
-    }
-
-    pub fn update_selected_tree_item(&mut self, tree: &TreeNode<NodeIdT>) {
-        let nothing_selected = self.tree_state.selected().is_empty();
-        let selected_item = tree.get_selected_node(&self.tree_state.selected());
-        let selected_item_is_in_tree = selected_item.is_some();
-        let selected_item_is_direct_match = selected_item.map_or(false, |t| t.is_direct_match);
-
-        if nothing_selected || !selected_item_is_in_tree || !selected_item_is_direct_match {
-            self.tree_state.select(tree.path_to_first_match());
         }
     }
 }

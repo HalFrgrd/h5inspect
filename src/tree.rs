@@ -1,6 +1,5 @@
 use fuzzy_matcher::skim::SkimMatcherV2;
 use fuzzy_matcher::FuzzyMatcher;
-use log::*;
 use std::hash::Hash;
 
 #[derive(Debug, Clone, PartialEq)]
