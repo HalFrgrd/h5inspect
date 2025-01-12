@@ -39,8 +39,8 @@ pub enum Mode {
 }
 
 impl App {
-    pub fn new(h5_file_path: PathBuf) -> App {
-        let h5_file = hdf5::File::open(h5_file_path.clone()).expect("Couldn't open h5 file");
+    pub fn new(h5_file_path: PathBuf) -> Result<App, hdf5_metno::Error> {
+        let h5_file = hdf5::File::open(h5_file_path.clone())?;
 
         let (tx, rx) = mpsc::channel();
         thread::spawn(move || {
@@ -49,7 +49,7 @@ impl App {
             tx.send((tree, tree_node_to_object)).unwrap();
         });
 
-        App {
+        Ok(App {
             h5_file_path,
             tree_state: tui_tree_widget::TreeState::default(),
             tree: None,
@@ -58,11 +58,14 @@ impl App {
             search_query_right: String::new(),
             mode: Mode::Normal,
             rx,
-        }
+        })
     }
 
     fn relative_child_name<'a>(parent: &str, child: &'a str) -> &'a str {
         let x = child.strip_prefix(parent).unwrap();
+        if x == "/" {
+            return "/";
+        }
         x.strip_prefix("/").unwrap_or(x)
     }
 
@@ -105,7 +108,7 @@ impl App {
 
         let mut tree_node_to_object = HashMap::new();
         let root_group = h5_file.group("/").expect("Couldn't open root group");
-        let tree = tree_from_group("/", root_group, &mut tree_node_to_object);
+        let tree = tree_from_group("", root_group, &mut tree_node_to_object);
         Ok((tree, tree_node_to_object))
     }
 
@@ -176,6 +179,14 @@ impl App {
         }
     }
 
+    fn on_up(&mut self) {
+        self.tree_state.key_up();
+    }
+
+    fn on_down(&mut self) {
+        self.tree_state.key_down();
+    }
+
     fn on_keypress_normal_mode(&mut self, keycode: KeyCode) -> () {
         match keycode {
             KeyCode::Left => {
@@ -185,16 +196,16 @@ impl App {
                 self.tree_state.key_left();
             }
             KeyCode::Up => {
-                self.tree_state.key_up();
+                self.on_up();
             }
             KeyCode::Char('k') => {
-                self.tree_state.key_up();
+                self.on_up();
             }
             KeyCode::Down => {
-                self.tree_state.key_down();
+                self.on_down();
             }
             KeyCode::Char('j') => {
-                self.tree_state.key_down();
+                self.on_down();
             }
             KeyCode::Right => {
                 self.tree_state.key_right();
@@ -286,6 +297,12 @@ impl App {
             KeyCode::BackTab => {
                 self.on_shift_tab();
             }
+            KeyCode::Up => {
+                self.on_up();
+            }
+            KeyCode::Down => {
+                self.on_down();
+            }
             _ => {}
         };
     }
@@ -319,7 +336,7 @@ impl App {
 
                     match self.mode {
                         Mode::Normal => match key.code {
-                            KeyCode::Char('q') | KeyCode::Esc => {
+                            KeyCode::Char('q') => {
                                 return Ok(true);
                             }
                             KeyCode::Char('/') => {

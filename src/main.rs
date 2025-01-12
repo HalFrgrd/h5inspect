@@ -28,7 +28,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     color_eyre::install()?;
     let terminal = ratatui::init();
-    let app = App::new(h5_file_path);
+    let app = App::new(h5_file_path)?;
     let _ = app.run(terminal);
     ratatui::restore();
 

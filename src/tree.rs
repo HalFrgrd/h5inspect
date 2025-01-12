@@ -99,6 +99,7 @@ where
         }
     }
 
+    #[allow(dead_code)]
     pub fn contains_path(&self, path: &[IdT]) -> bool {
         if path.is_empty() {
             return true;

@@ -4,6 +4,7 @@ use hdf5::{File, Result};
 use hdf5_metno as hdf5;
 use ndarray::Array2;
 
+#[allow(dead_code)]
 pub fn generate_dummy_file() -> Result<()> {
     let file = File::create("dummy.h5")?;
 
