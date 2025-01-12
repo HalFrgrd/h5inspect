@@ -85,7 +85,7 @@ fn render_object_info(frame: &mut Frame, app: &mut App, area: Rect) {
     let mut text = "Select on the left".to_string();
     if !selected.is_empty() {
         // selected is of form: ["/group1", "/group1/dataset1"]
-        text = app.get_text_for(selected.last().unwrap().clone());
+        text = app.get_text_for(selected);
     }
     let paragraph = Paragraph::new(text).wrap(Wrap { trim: true });
     frame.render_widget(paragraph.clone().block(object_info), area);
@@ -93,7 +93,7 @@ fn render_object_info(frame: &mut Frame, app: &mut App, area: Rect) {
 
 fn render_search(frame: &mut Frame, app: &mut App, area: Rect) {
     let search_block = Block::new()
-        .title("Search (type '/')")
+        .title("Fuzzy search (type '/')")
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded);
 

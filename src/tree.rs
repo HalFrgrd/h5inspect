@@ -2,6 +2,8 @@ use fuzzy_matcher::skim::SkimMatcherV2;
 use fuzzy_matcher::FuzzyMatcher;
 use std::hash::Hash;
 
+use crate::app::Hdf5Object;
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct TreeNode<IdT>
 where
@@ -11,8 +13,10 @@ where
     text: String,
     children: Vec<TreeNode<IdT>>,
     recursive_num_children: usize,
+    pub recursive_data_size: usize,
     matching_indices: Vec<usize>,
     pub is_direct_match: bool,
+    pub hdf5_object: Option<Hdf5Object>,
 }
 
 impl<IdT> TreeNode<IdT>
@@ -36,14 +40,31 @@ where
             .sum::<usize>()
             + children.len();
 
+        let recursive_data_size: usize = children
+            .iter()
+            .map(|child| child.recursive_data_size)
+            .sum::<usize>();
+
         Self {
             id: id.into(),
             text: text.into(),
             children,
             recursive_num_children,
+            recursive_data_size,
             matching_indices: indices,
             is_direct_match,
+            hdf5_object: None,
         }
+    }
+
+    pub fn set_dataset_size(mut self, size: usize) -> Self {
+        self.recursive_data_size = size;
+        self
+    }
+
+    pub fn set_hdf5_object(mut self, hdf5_object: Hdf5Object) -> Self {
+        self.hdf5_object = Some(hdf5_object);
+        self
     }
 
     /// Get a reference to this node's ID

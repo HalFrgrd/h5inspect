@@ -14,7 +14,10 @@ mod ui;
 
 #[tokio::main(flavor = "multi_thread", worker_threads = 10)]
 async fn main() -> Result<(), Box<dyn Error>> {
-    // crate::h5_gen::generate_dummy_file()?;
+    crate::h5_gen::generate_dummy_file()?;
+    tui_logger::init_logger(log::LevelFilter::Trace)?;
+    tui_logger::set_default_level(log::LevelFilter::Trace);
+
     let matches = Command::new("h5inspect")
         .author("Hal Frigaard")
         .about("Simple TUI to inspect h5 files")
@@ -29,14 +32,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let h5_file_name: &String = matches.get_one("h5file").expect("h5file is required");
     let h5_file_path = std::path::PathBuf::from(h5_file_name);
+    let app = App::new(h5_file_path)?;
 
     color_eyre::install()?;
     let terminal = ratatui::init();
 
-    tui_logger::init_logger(log::LevelFilter::Trace)?;
-    tui_logger::set_default_level(log::LevelFilter::Trace);
-
-    let app = App::new(h5_file_path)?;
     let _ = app.run(terminal).await;
 
     ratatui::restore();

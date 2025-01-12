@@ -1,4 +1,5 @@
 use crate::events;
+use crate::h5_utils;
 use crate::tree::TreeNode;
 use crate::ui::ui;
 use crossterm::event::{MouseButton, MouseEventKind};
@@ -8,21 +9,24 @@ use ratatui::{
     crossterm::event::{KeyCode, KeyModifiers},
     DefaultTerminal,
 };
-use std::collections::HashMap;
 use std::path::PathBuf;
-// use std::sync::mpsc;
-// use std::thread;
 
+#[allow(unused_imports)]
 use log::*;
 
-enum Hdf5Object {
+#[derive(Debug, Clone)]
+pub enum Hdf5Object {
     Group(hdf5::Group),
     Dataset(hdf5::Dataset),
 }
 
-// pub type NodeIdT = String;
+impl PartialEq for Hdf5Object {
+    fn eq(&self, other: &Self) -> bool {
+        std::ptr::eq(self, other)
+    }
+}
+
 pub type NodeIdT = hdf5_metno_sys::h5i::hid_t;
-type TreeNodeToObject = HashMap<NodeIdT, Hdf5Object>;
 
 pub struct App {
     running: bool,
@@ -30,11 +34,10 @@ pub struct App {
     pub tree_state: tui_tree_widget::TreeState<NodeIdT>,
     pub tree: Option<TreeNode<NodeIdT>>,
     pub filtered_tree: Option<TreeNode<NodeIdT>>,
-    tree_node_to_object: TreeNodeToObject,
     pub search_query_left: String,
     pub search_query_right: String,
     pub mode: Mode,
-    rx: tokio::sync::mpsc::Receiver<(TreeNode<NodeIdT>, TreeNodeToObject)>,
+    rx: tokio::sync::mpsc::Receiver<TreeNode<NodeIdT>>,
     pub show_logs: bool,
 }
 
@@ -51,9 +54,8 @@ impl App {
 
         let (tx, rx) = tokio::sync::mpsc::channel(1);
         tokio::spawn(async move {
-            let (tree, tree_node_to_object) =
-                App::tree_from_h5(&h5_file).expect("Failed to parse HDF5 structure");
-            tx.send((tree, tree_node_to_object)).await.unwrap();
+            let tree = App::tree_from_h5(&h5_file).expect("Failed to parse HDF5 structure");
+            tx.send(tree).await.unwrap();
         });
 
         Ok(App {
@@ -62,7 +64,6 @@ impl App {
             tree_state: tui_tree_widget::TreeState::default(),
             tree: None,
             filtered_tree: None,
-            tree_node_to_object: HashMap::new(),
             search_query_left: String::new(),
             search_query_right: String::new(),
             mode: Mode::Normal,
@@ -71,113 +72,64 @@ impl App {
         })
     }
 
-    // fn relative_child_name<'a>(parent: &str, child: &'a str) -> &'a str {
-    //     let x = child.strip_prefix(parent).unwrap_or(child);
-    //     if x == "/" {
-    //         return "/";
-    //     }
-    //     x.strip_prefix("/").unwrap_or(x)
-    // }
-
-    fn tree_from_h5(
-        h5_file: &hdf5::File,
-    ) -> Result<(TreeNode<NodeIdT>, HashMap<NodeIdT, Hdf5Object>), std::io::Error> {
-        fn tree_from_group(
-            group_name: &str,
-            group: hdf5::Group,
-            tree_node_to_object: &mut HashMap<NodeIdT, Hdf5Object>,
-        ) -> TreeNode<NodeIdT> {
+    fn tree_from_h5(h5_file: &hdf5::File) -> Result<TreeNode<NodeIdT>, std::io::Error> {
+        fn tree_from_group(group_name: &str, group: hdf5::Group) -> TreeNode<NodeIdT> {
             // TODO: avoid circular walks
             // The identifier for each TreeNode is the unmodified hdf5 group/dataset name.
             // The name is the full path inside the hdf5 file.
             // This allows us to retrieve the object later
 
-            // let group_name = group.name();
-            // let group_name = parent_name.to_string() + "/asd";
-
-            let mut children: Vec<_> = crate::h5_utils::groups(&group)
+            let mut children: Vec<_> = h5_utils::groups(&group)
                 .unwrap_or(vec![])
                 .into_iter()
-                .map(|(name, child)| tree_from_group(&name, child, tree_node_to_object))
+                .map(|(name, child)| tree_from_group(&name, child))
                 .collect();
 
-            let datasets = crate::h5_utils::datasets(&group).unwrap_or(vec![]);
+            let datasets = h5_utils::datasets(&group).unwrap_or(vec![]);
 
-            for (_, (dataset_name, dataset)) in datasets.iter().enumerate() {
-                // let dataset_name = format!("{}/{}", group_name, dataset_idx);
-                // let dataset_name = dataset.name();
+            for (dataset_name, dataset) in datasets.into_iter() {
                 let text = dataset_name.clone();
                 let node_id = dataset.id();
-                tree_node_to_object.insert(node_id, Hdf5Object::Dataset(dataset.clone()));
-                children.push(TreeNode::new(node_id, text, vec![]));
+                children.push(
+                    TreeNode::new(node_id, text, vec![])
+                        .set_dataset_size(dataset.size())
+                        .set_hdf5_object(Hdf5Object::Dataset(dataset)),
+                );
             }
 
-            let group_id = group.id();
-            let text = group_name.to_string();
-            tree_node_to_object.insert(group_id, Hdf5Object::Group(group));
-            TreeNode::new(group_id, text, children)
+            TreeNode::new(group.id(), group_name, children)
+                .set_hdf5_object(Hdf5Object::Group(group))
         }
         // TODO anonymous datasets
 
-        let mut tree_node_to_object = HashMap::new();
         let root_name = "/";
         let root_group = h5_file.group(root_name).expect("Couldn't open root group");
-        let tree = tree_from_group(root_name, root_group, &mut tree_node_to_object);
-        Ok((tree, tree_node_to_object))
+        Ok(tree_from_group(root_name, root_group))
     }
 
-    fn get_text_for_dataset(dataset: &hdf5::Dataset) -> String {
-        let shape = dataset.shape();
-        let datatype = dataset.dtype();
-        let space = dataset.space();
-        let chunks = dataset.chunk();
-        let chunk_info = match chunks {
-            Some(chunks) => format!("Chunked ({:?})", chunks),
-            None => "Contiguous".to_string(),
-        };
-
-        // Get compression info
-        let compression = dataset.filters();
-        let compression_info = format!("Filter pipeline: {:?}", compression);
-
-        // Get storage size vs data size
-        let storage_size = dataset.storage_size();
-        let data_size = dataset.size() * dataset.dtype().map_or(0, |dt| dt.size());
-        let compression_ratio = if storage_size > 0 {
-            data_size as f64 / storage_size as f64
+    pub fn get_text_for(&self, path: &[NodeIdT]) -> String {
+        if let Some(tree) = &self.tree {
+            match tree.get_selected_node(path) {
+                Some(ref tree_node) => match &tree_node.hdf5_object {
+                    Some(Hdf5Object::Dataset(dataset)) => h5_utils::get_text_for_dataset(&dataset),
+                    Some(Hdf5Object::Group(group)) => {
+                        let text = h5_utils::get_text_for_group(&group);
+                        let size = tree_node.recursive_data_size;
+                        format!("{} {}", text, size)
+                    }
+                    None => {
+                        debug!("No hdf5 object found at path {:?}", path);
+                        "".to_string()
+                    }
+                },
+                None => {
+                    debug!("Couldn't find object at path {:?}", path);
+                    "".to_string()
+                }
+            }
         } else {
-            f64::NAN
-        };
-
-        format!(
-            "Dataset info:Name: {}\n\nShape: {:?}\nDatatype: {:?}\nSpace: {:?}\nStorage: {}\nCompression: {}\nStorage size: {} bytes\nData size: {} bytes\nCompression ratio: {:.2}",
-            dataset.name(), shape, datatype, space, chunk_info, compression_info, storage_size, data_size, compression_ratio
-        )
-    }
-
-    fn get_text_for_group(group: &hdf5::Group) -> String {
-        let num_groups = group.groups().unwrap_or(vec![]).len();
-        let num_datasets = group.datasets().unwrap_or(vec![]).len();
-        let attrs = group.attr_names().unwrap_or(vec![]);
-        let num_attrs = attrs.len();
-
-        format!(
-            "Group info:\nName: {}\nNumber of groups: {}\nNumber of datasets: {}\nNumber of attributes: {}\nAttribute names: {:?}",
-            group.name(),
-            num_groups,
-            num_datasets,
-            num_attrs,
-            attrs
-        )
-    }
-
-    pub fn get_text_for(&self, id: NodeIdT) -> String {
-        match self.tree_node_to_object.get(&id) {
-            Some(object) => match object {
-                Hdf5Object::Dataset(dataset) => App::get_text_for_dataset(dataset),
-                Hdf5Object::Group(group) => App::get_text_for_group(group),
-            },
-            None => format!("Couldn't find object with id {}", id),
+            debug!("No tree found");
+            "".to_string()
         }
     }
 
@@ -272,13 +224,11 @@ impl App {
     }
 
     fn on_tab(&mut self) -> () {
-        info!("on_tab");
         self.tree_state
             .select_relative(|x| x.map_or(0, |current| current.saturating_add(1)));
     }
 
     fn on_shift_tab(&mut self) -> () {
-        warn!("on_shift_tab");
         self.tree_state
             .select_relative(|x| x.map_or(0, |current| current.saturating_sub(1)));
     }
@@ -376,9 +326,8 @@ impl App {
                         events::Event::Resize => {}
                     }
                 }
-                Some((tree, tree_node_to_object)) = self.rx.recv() => {
+                Some(tree) = self.rx.recv() => {
                     self.tree = Some(tree);
-                    self.tree_node_to_object = tree_node_to_object;
                     self.tree_state.open(vec![self.tree.as_ref().unwrap().id()]);
                     self.update_filtered_tree();
                 }
