@@ -1,3 +1,4 @@
+use crate::events;
 use crate::tree::TreeNode;
 use crate::ui::ui;
 use crossterm::event::{MouseButton, MouseEventKind};
@@ -11,7 +12,6 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::mpsc;
 use std::thread;
-use crate::events;
 
 // pub type NodeIdT = String;
 pub type NodeIdT = hdf5_metno_sys::h5i::hid_t;
@@ -312,9 +312,11 @@ impl App {
         };
     }
 
-    pub async fn run(mut self, mut terminal: DefaultTerminal) -> Result<(), Box<dyn std::error::Error>> {
-
-        if let Ok((tree, tree_node_to_object)) = self.rx.recv(){
+    pub async fn run(
+        mut self,
+        mut terminal: DefaultTerminal,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        if let Ok((tree, tree_node_to_object)) = self.rx.recv() {
             self.tree = Some(tree);
             self.tree_node_to_object = tree_node_to_object;
             self.tree_state.open(vec![self.tree.as_ref().unwrap().id()]);
@@ -322,11 +324,11 @@ impl App {
 
         while self.running {
             terminal.draw(|frame| ui(frame, &mut self))?;
-            
+
             match self.events.next().await? {
                 events::Event::Tick => {}
-                events::Event::Key(key) => { self.handle_keypress(key) }
-                events::Event::Mouse(mouse) => { self.handle_mouse(mouse) }
+                events::Event::Key(key) => self.handle_keypress(key),
+                events::Event::Mouse(mouse) => self.handle_mouse(mouse),
                 events::Event::Resize(_, _) => {}
             }
         }
