@@ -3,6 +3,8 @@ use clap::{Arg, Command};
 use color_eyre::Result;
 use std::error::Error;
 
+use tui_logger;
+
 mod app;
 mod events;
 mod h5_gen;
@@ -30,6 +32,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     color_eyre::install()?;
     let terminal = ratatui::init();
+
+    tui_logger::init_logger(log::LevelFilter::Trace)?;
+    tui_logger::set_default_level(log::LevelFilter::Trace);
+
     let app = App::new(h5_file_path)?;
     let _ = app.run(terminal).await;
 

@@ -13,6 +13,8 @@ use std::path::PathBuf;
 // use std::sync::mpsc;
 // use std::thread;
 
+use log::*;
+
 enum Hdf5Object {
     Group(hdf5::Group),
     Dataset(hdf5::Dataset),
@@ -65,19 +67,18 @@ impl App {
         })
     }
 
-    fn relative_child_name<'a>(parent: &str, child: &'a str) -> &'a str {
-        let x = child.strip_prefix(parent).unwrap_or(child);
-        if x == "/" {
-            return "/";
-        }
-        x.strip_prefix("/").unwrap_or(x)
-    }
+    // fn relative_child_name<'a>(parent: &str, child: &'a str) -> &'a str {
+    //     let x = child.strip_prefix(parent).unwrap_or(child);
+    //     if x == "/" {
+    //         return "/";
+    //     }
+    //     x.strip_prefix("/").unwrap_or(x)
+    // }
 
     fn tree_from_h5(
         h5_file: &hdf5::File,
     ) -> Result<(TreeNode<NodeIdT>, HashMap<NodeIdT, Hdf5Object>), std::io::Error> {
         fn tree_from_group(
-            parent_name: &str,
             group_name: &str,
             group: hdf5::Group,
             tree_node_to_object: &mut HashMap<NodeIdT, Hdf5Object>,
@@ -93,9 +94,7 @@ impl App {
             let mut children: Vec<_> = crate::h5_utils::groups(&group)
                 .unwrap_or(vec![])
                 .into_iter()
-                .map(|(name, child)| {
-                    tree_from_group(&group_name, &name, child, tree_node_to_object)
-                })
+                .map(|(name, child)| tree_from_group(&name, child, tree_node_to_object))
                 .collect();
 
             let datasets = crate::h5_utils::datasets(&group).unwrap_or(vec![]);
@@ -103,22 +102,23 @@ impl App {
             for (_, (dataset_name, dataset)) in datasets.iter().enumerate() {
                 // let dataset_name = format!("{}/{}", group_name, dataset_idx);
                 // let dataset_name = dataset.name();
-                let text = App::relative_child_name(&group_name, &dataset_name);
+                let text = dataset_name.clone();
                 let node_id = dataset.id();
                 tree_node_to_object.insert(node_id, Hdf5Object::Dataset(dataset.clone()));
                 children.push(TreeNode::new(node_id, text, vec![]));
             }
 
             let group_id = group.id();
-            let text = App::relative_child_name(&parent_name, &group_name).to_string();
+            let text = group_name.to_string();
             tree_node_to_object.insert(group_id, Hdf5Object::Group(group));
             TreeNode::new(group_id, text, children)
         }
         // TODO anonymous datasets
 
         let mut tree_node_to_object = HashMap::new();
-        let root_group = h5_file.group("/").expect("Couldn't open root group");
-        let tree = tree_from_group("", "/", root_group, &mut tree_node_to_object);
+        let root_name = "/";
+        let root_group = h5_file.group(root_name).expect("Couldn't open root group");
+        let tree = tree_from_group(root_name, root_group, &mut tree_node_to_object);
         Ok((tree, tree_node_to_object))
     }
 
@@ -265,11 +265,13 @@ impl App {
     }
 
     fn on_tab(&mut self) -> () {
+        info!("on_tab");
         self.tree_state
             .select_relative(|x| x.map_or(0, |current| current.saturating_add(1)));
     }
 
     fn on_shift_tab(&mut self) -> () {
+        warn!("on_shift_tab");
         self.tree_state
             .select_relative(|x| x.map_or(0, |current| current.saturating_sub(1)));
     }

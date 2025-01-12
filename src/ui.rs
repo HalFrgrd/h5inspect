@@ -25,7 +25,12 @@ pub fn ui(frame: &mut Frame, app: &mut App) {
 
     render_search(frame, app, left_layout[1]);
     render_tree(frame, app, left_layout[0]);
-    render_object_info(frame, app, chunks[1]);
+
+    let right_layout =
+        Layout::vertical([Constraint::Percentage(30), Constraint::Min(0)]).split(chunks[1]);
+
+    render_object_info(frame, app, right_layout[0]);
+    render_logger(frame, app, right_layout[1]);
 }
 impl<IdT> tree::TreeNode<IdT>
 where
@@ -156,10 +161,26 @@ fn render_tree(frame: &mut Frame, app: &mut App, area: Rect) {
             frame.render_widget(
                 Paragraph::new("Loading tree...")
                     .centered()
-                    .block(tree_block)
-                    .style(Style::default().bg(Color::Red)),
+                    .block(tree_block),
                 area,
             );
         }
     }
+}
+
+use ratatui::widgets::Widget;
+use tui_logger;
+
+fn render_logger(frame: &mut Frame, app: &mut App, area: Rect) {
+    let logger_widget = tui_logger::TuiLoggerWidget::default()
+        .block(Block::bordered().title("Unfiltered TuiLoggerWidget"))
+        .output_separator('|')
+        .output_timestamp(Some("%F %H:%M:%S%.3f".to_string()))
+        .output_level(Some(tui_logger::TuiLoggerLevelOutput::Long))
+        .output_target(false)
+        .output_file(false)
+        .output_line(false)
+        .style(Style::default().fg(Color::White));
+
+    frame.render_widget(logger_widget, area);
 }
