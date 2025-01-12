@@ -354,6 +354,7 @@ impl App {
                     self.tree_state.open(first_match[0..i].to_vec());
                 }
             }
+            self.tree_state.scroll_selected_into_view();
         }
     }
 
