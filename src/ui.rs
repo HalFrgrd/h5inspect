@@ -8,6 +8,7 @@ use ratatui::{
     widgets::{Block, BorderType, Borders, Paragraph, Wrap},
     Frame,
 };
+use tui_logger;
 use tui_tree_widget::Tree as WidgetTreeRoot;
 use tui_tree_widget::TreeItem as WidgetTreeItem;
 
@@ -29,8 +30,12 @@ pub fn ui(frame: &mut Frame, app: &mut App) {
     let right_layout =
         Layout::vertical([Constraint::Percentage(30), Constraint::Min(0)]).split(chunks[1]);
 
-    render_object_info(frame, app, right_layout[0]);
-    render_logger(frame, app, right_layout[1]);
+    if app.show_logs {
+        render_object_info(frame, app, right_layout[0]);
+        render_logger(frame, right_layout[1]);
+    } else {
+        render_object_info(frame, app, chunks[1]);
+    }
 }
 impl<IdT> tree::TreeNode<IdT>
 where
@@ -73,7 +78,7 @@ where
 
 fn render_object_info(frame: &mut Frame, app: &mut App, area: Rect) {
     let object_info = Block::new()
-        .title("object info")
+        .title("Object info")
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded);
     let selected = app.tree_state.selected();
@@ -168,19 +173,19 @@ fn render_tree(frame: &mut Frame, app: &mut App, area: Rect) {
     }
 }
 
-use ratatui::widgets::Widget;
-use tui_logger;
-
-fn render_logger(frame: &mut Frame, app: &mut App, area: Rect) {
+fn render_logger(frame: &mut Frame, area: Rect) {
     let logger_widget = tui_logger::TuiLoggerWidget::default()
-        .block(Block::bordered().title("Unfiltered TuiLoggerWidget"))
+        .block(
+            Block::bordered()
+                .title("Logs (hide with 'g')")
+                .borders(Borders::ALL)
+                .border_type(BorderType::Rounded),
+        )
         .output_separator('|')
         .output_timestamp(Some("%F %H:%M:%S%.3f".to_string()))
-        .output_level(Some(tui_logger::TuiLoggerLevelOutput::Long))
+        .output_level(Some(tui_logger::TuiLoggerLevelOutput::Abbreviated))
         .output_target(false)
         .output_file(false)
-        .output_line(false)
-        .style(Style::default().fg(Color::White));
-
+        .output_line(false);
     frame.render_widget(logger_widget, area);
 }

@@ -34,6 +34,7 @@ pub struct App {
     pub search_query_right: String,
     pub mode: Mode,
     rx: tokio::sync::mpsc::Receiver<(TreeNode<NodeIdT>, TreeNodeToObject)>,
+    pub show_logs: bool,
 }
 
 pub enum Mode {
@@ -64,6 +65,7 @@ impl App {
             search_query_right: String::new(),
             mode: Mode::Normal,
             rx,
+            show_logs: false,
         })
     }
 
@@ -250,6 +252,9 @@ impl App {
                         }));
                     }
                 }
+            }
+            KeyCode::Char('g') => {
+                self.show_logs = !self.show_logs;
             }
             _ => {}
         }
