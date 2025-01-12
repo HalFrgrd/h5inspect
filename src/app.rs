@@ -66,7 +66,7 @@ impl App {
     }
 
     fn relative_child_name<'a>(parent: &str, child: &'a str) -> &'a str {
-        let x = child.strip_prefix(parent).unwrap();
+        let x = child.strip_prefix(parent).unwrap_or(child);
         if x == "/" {
             return "/";
         }
@@ -78,6 +78,7 @@ impl App {
     ) -> Result<(TreeNode<NodeIdT>, HashMap<NodeIdT, Hdf5Object>), std::io::Error> {
         fn tree_from_group(
             parent_name: &str,
+            group_name: &str,
             group: hdf5::Group,
             tree_node_to_object: &mut HashMap<NodeIdT, Hdf5Object>,
         ) -> TreeNode<NodeIdT> {
@@ -86,20 +87,22 @@ impl App {
             // The name is the full path inside the hdf5 file.
             // This allows us to retrieve the object later
 
-            let group_name = group.name();
+            // let group_name = group.name();
+            // let group_name = parent_name.to_string() + "/asd";
 
-            let mut children: Vec<_> = group
-                .groups()
+            let mut children: Vec<_> = crate::h5_utils::groups(&group)
                 .unwrap_or(vec![])
                 .into_iter()
-                .map(|child| tree_from_group(&group_name, child, tree_node_to_object))
+                .map(|(name, child)| {
+                    tree_from_group(&group_name, &name, child, tree_node_to_object)
+                })
                 .collect();
 
-            let datasets = group.datasets().unwrap_or(vec![]);
+            let datasets = crate::h5_utils::datasets(&group).unwrap_or(vec![]);
 
-            for dataset in datasets {
-                // let dataset_name = group_name.clone() + "/asd" + &dataset_idx.to_string();
-                let dataset_name = dataset.name();
+            for (_, (dataset_name, dataset)) in datasets.iter().enumerate() {
+                // let dataset_name = format!("{}/{}", group_name, dataset_idx);
+                // let dataset_name = dataset.name();
                 let text = App::relative_child_name(&group_name, &dataset_name);
                 let node_id = dataset.id();
                 tree_node_to_object.insert(node_id, Hdf5Object::Dataset(dataset.clone()));
@@ -115,7 +118,7 @@ impl App {
 
         let mut tree_node_to_object = HashMap::new();
         let root_group = h5_file.group("/").expect("Couldn't open root group");
-        let tree = tree_from_group("", root_group, &mut tree_node_to_object);
+        let tree = tree_from_group("", "/", root_group, &mut tree_node_to_object);
         Ok((tree, tree_node_to_object))
     }
 
