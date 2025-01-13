@@ -4,11 +4,8 @@ use crate::tree::TreeNode;
 use crate::ui::ui;
 use crossterm::event::{MouseButton, MouseEventKind};
 use hdf5_metno as hdf5;
+use ratatui::crossterm::event::{KeyCode, KeyModifiers};
 use ratatui::layout::Position;
-use ratatui::{
-    crossterm::event::{KeyCode, KeyModifiers},
-    DefaultTerminal,
-};
 use std::path::PathBuf;
 
 #[allow(unused_imports)]
@@ -46,9 +43,8 @@ pub enum Mode {
 }
 
 impl App {
-    pub fn new(h5_file_path: PathBuf) -> Result<App, Box<dyn std::error::Error>> {
-
-        Ok(App {
+    pub fn new(h5_file_path: PathBuf) -> App {
+        App {
             running: true,
             h5_file_path,
             tree_state: tui_tree_widget::TreeState::default(),
@@ -58,7 +54,7 @@ impl App {
             search_query_right: String::new(),
             mode: Mode::Normal,
             show_logs: cfg!(debug_assertions),
-        })
+        }
     }
 
     fn tree_from_h5(h5_file: &hdf5::File) -> Result<TreeNode<NodeIdT>, std::io::Error> {
@@ -297,13 +293,12 @@ impl App {
         }
     }
 
-    pub async fn run(
+    pub async fn run<B: ratatui::backend::Backend>(
         mut self,
-        mut terminal: DefaultTerminal,
+        mut terminal: ratatui::Terminal<B>,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        
         let h5_file = h5_utils::open_file(&self.h5_file_path)?;
-        
+
         let (tx, mut rx) = tokio::sync::mpsc::channel::<TreeNode<NodeIdT>>(1);
         tokio::spawn(async move {
             let tree = App::tree_from_h5(&h5_file).expect("Failed to parse HDF5 structure");

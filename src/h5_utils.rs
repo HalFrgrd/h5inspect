@@ -1,8 +1,7 @@
-use hdf5_metno as hdf5;
 use hdf5::{File, Result};
+use hdf5_metno as hdf5;
 use ndarray::Array2;
 use std::path::PathBuf;
-
 
 // Calling group.name() or dataset.name() was very slow for some reason.
 // But group.member_names() was fast.
@@ -88,7 +87,6 @@ pub fn get_text_for_group(group: &hdf5::Group) -> String {
     )
 }
 
-
 #[allow(dead_code)]
 pub fn generate_dummy_file() -> Result<()> {
     let file = File::create("dummy.h5")?;
@@ -163,10 +161,7 @@ pub fn generate_dummy_split_file() -> Result<()> {
         .create("dummy_split.h5")?;
 
     // Create a dataset
-    let ds = file
-        .new_dataset::<i32>()
-        .shape((ny, nx))
-        .create("data")?;
+    let ds = file.new_dataset::<i32>().shape((ny, nx)).create("data")?;
     ds.write(&arr)?;
 
     // Create some groups and datasets
