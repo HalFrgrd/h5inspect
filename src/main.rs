@@ -7,14 +7,14 @@ use tui_logger;
 
 mod app;
 mod events;
-mod h5_gen;
 mod h5_utils;
 mod tree;
 mod ui;
 
 #[tokio::main(flavor = "multi_thread", worker_threads = 10)]
 async fn main() -> Result<(), Box<dyn Error>> {
-    crate::h5_gen::generate_dummy_file()?;
+    crate::h5_utils::generate_dummy_file()?;
+    crate::h5_utils::generate_dummy_split_file()?;
     tui_logger::init_logger(log::LevelFilter::Trace)?;
     tui_logger::set_default_level(log::LevelFilter::Trace);
 

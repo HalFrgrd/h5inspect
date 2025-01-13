@@ -37,7 +37,6 @@ pub struct App {
     pub search_query_left: String,
     pub search_query_right: String,
     pub mode: Mode,
-    rx: tokio::sync::mpsc::Receiver<TreeNode<NodeIdT>>,
     pub show_logs: bool,
 }
 
@@ -48,15 +47,6 @@ pub enum Mode {
 
 impl App {
     pub fn new(h5_file_path: PathBuf) -> Result<App, Box<dyn std::error::Error>> {
-        let h5_file = hdf5::File::with_options()
-            .with_fapl(|p| p.sec2())
-            .open(h5_file_path.clone())?;
-
-        let (tx, rx) = tokio::sync::mpsc::channel(1);
-        tokio::spawn(async move {
-            let tree = App::tree_from_h5(&h5_file).expect("Failed to parse HDF5 structure");
-            tx.send(tree).await.unwrap();
-        });
 
         Ok(App {
             running: true,
@@ -67,7 +57,6 @@ impl App {
             search_query_left: String::new(),
             search_query_right: String::new(),
             mode: Mode::Normal,
-            rx,
             show_logs: cfg!(debug_assertions),
         })
     }
@@ -312,6 +301,15 @@ impl App {
         mut self,
         mut terminal: DefaultTerminal,
     ) -> Result<(), Box<dyn std::error::Error>> {
+        
+        let h5_file = h5_utils::open_file(&self.h5_file_path)?;
+        
+        let (tx, mut rx) = tokio::sync::mpsc::channel::<TreeNode<NodeIdT>>(1);
+        tokio::spawn(async move {
+            let tree = App::tree_from_h5(&h5_file).expect("Failed to parse HDF5 structure");
+            tx.send(tree).await.unwrap();
+        });
+
         let mut events = events::EventHandler::new();
 
         while self.running {
@@ -326,7 +324,7 @@ impl App {
                         events::Event::Resize => {}
                     }
                 }
-                Some(tree) = self.rx.recv() => {
+                Some(tree) = rx.recv() => {
                     self.tree = Some(tree);
                     self.tree_state.open(vec![self.tree.as_ref().unwrap().id()]);
                     self.update_filtered_tree();
