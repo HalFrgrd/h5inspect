@@ -195,6 +195,16 @@ impl App {
             KeyCode::Char('g') => {
                 self.show_logs = !self.show_logs;
             }
+            KeyCode::PageDown => {
+                self.tree_state.select_relative(|current| {
+                    current.map_or(0, |current| current.saturating_add(50))
+                });
+            }
+            KeyCode::PageUp => {
+                self.tree_state.select_relative(|current| {
+                    current.map_or(0, |current| current.saturating_sub(50))
+                });
+            }
             _ => {}
         }
     }
@@ -245,19 +255,7 @@ impl App {
             KeyCode::Delete => {
                 self.search_query_right.pop();
             }
-            KeyCode::Tab => {
-                self.on_tab();
-            }
-            KeyCode::BackTab => {
-                self.on_shift_tab();
-            }
-            KeyCode::Up => {
-                self.on_up();
-            }
-            KeyCode::Down => {
-                self.on_down();
-            }
-            _ => {}
+            keycode => self.on_keypress_normal_mode(keycode),
         };
         self.update_filtered_tree();
     }

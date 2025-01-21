@@ -13,9 +13,6 @@ mod tree;
 mod ui;
 
 fn main() -> Result<(), Box<dyn Error>> {
-    // crate::h5_utils::generate_dummy_file()?;
-    // crate::h5_utils::generate_dummy_split_file()?;
-
     let matches = Command::new("h5inspect")
         .author("Hal Frigaard")
         .about("Simple TUI to inspect h5 files")
@@ -30,7 +27,17 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let h5_file_name: &String = matches.get_one("h5file").expect("h5file is required");
     let h5_file_path = std::path::PathBuf::from(h5_file_name);
-    run(h5_file_path)
+    tui_logger::init_logger(log::LevelFilter::Trace)?;
+    tui_logger::set_default_level(log::LevelFilter::Trace);
+
+    let app = App::new(h5_file_path);
+    let runtime = build_runtime();
+
+    color_eyre::install()?;
+    let terminal = ratatui::init();
+    let res = runtime.block_on(app.run(terminal));
+    ratatui::restore();
+    res
 }
 
 fn build_runtime() -> tokio::runtime::Runtime {
@@ -41,31 +48,12 @@ fn build_runtime() -> tokio::runtime::Runtime {
         .unwrap()
 }
 
-fn run(h5_file_path: std::path::PathBuf) -> Result<(), Box<dyn Error>> {
-    tui_logger::init_logger(log::LevelFilter::Trace)?;
-    tui_logger::set_default_level(log::LevelFilter::Trace);
-
-    let app = App::new(h5_file_path);
-
-    color_eyre::install()?;
-    let terminal = ratatui::init();
-
-    let runtime = build_runtime();
-
-    runtime.block_on(async {
-        let _ = app.run(terminal).await;
-    });
-
-    ratatui::restore();
-    Ok(())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn test_app_startup() -> Result<(), Box<dyn Error>> {
+    fn run_app_startup() -> Result<(), Box<dyn Error>> {
         h5_utils::generate_dummy_file()?;
         let h5_file_path = std::path::PathBuf::from("dummy.h5");
         run_app(h5_file_path)
@@ -73,20 +61,20 @@ mod tests {
 
     #[test]
     #[should_panic(expected = "unable to open file: unable to open file")]
-    fn test_app_on_non_existent_file() {
+    fn run_app_on_non_existent_file() {
         let h5_file_path = std::path::PathBuf::from("non_existent.h5");
         run_app(h5_file_path).unwrap();
     }
 
     #[test]
     #[should_panic(expected = "unable to open file: file signature not found")]
-    fn test_app_on_non_h5_file() {
+    fn run_app_on_non_h5_file() {
         let h5_file_path = std::path::PathBuf::from("src/main.rs");
         run_app(h5_file_path).unwrap();
     }
 
     #[test]
-    fn test_app_on_split_file() -> Result<(), Box<dyn Error>> {
+    fn run_app_on_split_file() -> Result<(), Box<dyn Error>> {
         h5_utils::generate_dummy_split_file()?;
         let h5_file_path = std::path::PathBuf::from("dummy_split.h5");
         run_app(h5_file_path)
@@ -99,18 +87,18 @@ mod tests {
         let terminal = ratatui::Terminal::new(backend).unwrap();
 
         let runtime = build_runtime();
-
-        runtime.block_on(async {
+        let res = runtime.block_on(async {
             tokio::select! {
                 res = app.run(terminal) => {
-                    res.unwrap();
+                    res
                 }
                 _ = tokio::time::sleep(std::time::Duration::from_secs(2)) => {
                     println!("Timer expired before app returned, nice.");
+                    Ok(())
                 }
             }
         });
 
-        Ok(())
+        res
     }
 }

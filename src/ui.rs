@@ -1,5 +1,6 @@
 use crate::app::{App, Mode};
 use crate::tree;
+use ratatui::style::Modifier;
 use ratatui::text::Line;
 use ratatui::text::Span;
 use ratatui::{
@@ -13,9 +14,9 @@ use tui_tree_widget::Tree as WidgetTreeRoot;
 use tui_tree_widget::TreeItem as WidgetTreeItem;
 
 use std::hash::Hash;
-const STYLE_HIGHLIGHT: Style = Style::new().fg(Color::White).bg(Color::Gray);
+const STYLE_HIGHLIGHT: Style = Style::new().bg(Color::Gray);
 const STYLE_EXTRA_INFO: Style = Style::new().fg(Color::Gray);
-const STYLE_MATCH: Style = Style::new().fg(Color::Magenta).bg(Color::Yellow);
+const STYLE_MATCH: Style = Style::new().fg(Color::Red).add_modifier(Modifier::BOLD);
 
 pub fn ui(frame: &mut Frame, app: &mut App) {
     let chunks =
@@ -162,7 +163,7 @@ fn render_logger(frame: &mut Frame, area: Rect) {
     let logger_widget = tui_logger::TuiLoggerWidget::default()
         .block(
             Block::bordered()
-                .title("Logs (hide with 'g')")
+                .title("Logs (toggle with 'g')")
                 .borders(Borders::ALL)
                 .border_type(BorderType::Rounded),
         )
