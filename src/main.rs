@@ -60,14 +60,14 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "unable to open file: unable to open file")]
+    #[should_panic(expected = "File path doesn't exist")]
     fn run_app_on_non_existent_file() {
         let h5_file_path = std::path::PathBuf::from("non_existent.h5");
         run_app(h5_file_path).unwrap();
     }
 
     #[test]
-    #[should_panic(expected = "unable to open file: file signature not found")]
+    #[should_panic(expected = "Couldn't open file")]
     fn run_app_on_non_h5_file() {
         let h5_file_path = std::path::PathBuf::from("src/main.rs");
         run_app(h5_file_path).unwrap();

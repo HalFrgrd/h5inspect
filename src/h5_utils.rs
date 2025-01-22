@@ -178,7 +178,23 @@ pub fn generate_dummy_split_file() -> Result<()> {
 pub fn open_file(file_path: &PathBuf) -> Result<hdf5::File> {
     let file = hdf5::File::with_options()
         .with_fapl(|p| p.sec2())
-        .open(file_path.clone())?;
+        .open(file_path.clone());
 
-    Ok(file)
+    if file.is_ok() {
+        return file;
+    }
+
+    // Try with split driver if sec2 fails
+    let split_file = hdf5::File::with_options()
+        .with_fapl(|p| p.split_options("-m.h5", "-r.h5"))
+        .open(file_path.clone());
+
+    if split_file.is_ok() {
+        return split_file;
+    }
+
+    if !file_path.exists() {
+        return Err(format!("File path doesn't exist: {file_path:?}").into());
+    }
+    Err("Couldn't open file".into())
 }
