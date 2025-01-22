@@ -173,6 +173,9 @@ impl App {
             KeyCode::Enter => {
                 self.tree_state.toggle_selected();
             }
+            KeyCode::Char('c') => {
+                self.tree_state.toggle_selected();
+            }
             KeyCode::Tab => {
                 self.on_tab();
             }
@@ -229,6 +232,7 @@ impl App {
     }
 
     fn on_keypress_search_mode(&mut self, keycode: KeyCode) {
+        let mut refresh_filtered_tree = true;
         match keycode {
             KeyCode::Char(to_insert) => {
                 self.search_query_left.push(to_insert);
@@ -255,9 +259,14 @@ impl App {
             KeyCode::Delete => {
                 self.search_query_right.pop();
             }
-            keycode => self.on_keypress_normal_mode(keycode),
+            keycode => {
+                refresh_filtered_tree = false;
+                self.on_keypress_normal_mode(keycode);
+            }
         };
-        self.update_filtered_tree();
+        if refresh_filtered_tree {
+            self.update_filtered_tree();
+        }
     }
 
     fn update_filtered_tree(&mut self) {

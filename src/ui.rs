@@ -15,7 +15,7 @@ use tui_tree_widget::TreeItem as WidgetTreeItem;
 
 use std::hash::Hash;
 const STYLE_HIGHLIGHT: Style = Style::new().bg(Color::Gray);
-const STYLE_EXTRA_INFO: Style = Style::new().fg(Color::Gray);
+const STYLE_EXTRA_INFO: Style = Style::new().fg(Color::DarkGray);
 const STYLE_MATCH: Style = Style::new().fg(Color::Red).add_modifier(Modifier::BOLD);
 
 pub fn ui(frame: &mut Frame, app: &mut App) {
