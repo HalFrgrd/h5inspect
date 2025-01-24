@@ -42,10 +42,16 @@ pub fn datasets(group: &hdf5::Group) -> hdf5::Result<Vec<(String, hdf5::Dataset)
     })
 }
 
-pub fn get_text_for_dataset(dataset: &hdf5::Dataset) -> String {
+pub fn get_text_for_dataset(dataset: &hdf5::Dataset) -> Vec<(String, String)> {
     let shape = dataset.shape();
-    let datatype = dataset.dtype();
-    let space = dataset.space();
+    let datatype = dataset
+        .dtype()
+        .map(|s| format!("{:?}", s))
+        .unwrap_or_else(|_| "unknown".to_string());
+    let space = dataset
+        .space()
+        .map(|s| format!("{:?}", s))
+        .unwrap_or_else(|_| "unknown".to_string());
     let chunks = dataset.chunk();
     let chunk_info = match chunks {
         Some(chunks) => format!("Chunked ({:?})", chunks),
@@ -65,26 +71,42 @@ pub fn get_text_for_dataset(dataset: &hdf5::Dataset) -> String {
         f64::NAN
     };
 
-    format!(
-        "Dataset info:\nPath: {}\nShape: {:?}\nDatatype: {:?}\nSpace: {:?}\nStorage: {}\nCompression: {}\nStorage size: {} bytes\nData size: {} bytes\nCompression ratio: {:.2}",
-        dataset.name(), shape, datatype, space, chunk_info, compression_info, storage_size, data_size, compression_ratio
-    )
+    let mut res = vec![];
+
+    res.push(("Path".to_string(), dataset.name().to_string()));
+    res.push(("Shape".to_string(), format!("{:?}", shape)));
+    res.push(("Datatype".to_string(), datatype));
+    res.push(("Space".to_string(), space));
+    res.push(("Storage".to_string(), chunk_info));
+    res.push(("Compression".to_string(), compression_info));
+    res.push((
+        "Storage size".to_string(),
+        format!("{} bytes", storage_size),
+    ));
+    res.push(("Data size".to_string(), format!("{} bytes", data_size)));
+    res.push((
+        "Compression ratio".to_string(),
+        format!("{:.2}", compression_ratio),
+    ));
+    res
 }
 
-pub fn get_text_for_group(group: &hdf5::Group) -> String {
+pub fn get_text_for_group(group: &hdf5::Group) -> Vec<(String, String)> {
     let num_groups = group.groups().unwrap_or(vec![]).len();
     let num_datasets = group.datasets().unwrap_or(vec![]).len();
     let attrs = group.attr_names().unwrap_or(vec![]);
     let num_attrs = attrs.len();
 
-    format!(
-        "Group info:\nPath: {}\nNumber of groups: {}\nNumber of datasets: {}\nNumber of attributes: {}\nAttribute names: {:?}",
-        group.name(),
-        num_groups,
-        num_datasets,
-        num_attrs,
-        attrs
-    )
+    let mut res = vec![];
+    res.push(("Path".to_string(), group.name().to_string()));
+    res.push(("Number of groups".to_string(), format!("{}", num_groups)));
+    res.push((
+        "Number of datasets".to_string(),
+        format!("{}", num_datasets),
+    ));
+    res.push(("Number of attributes".to_string(), format!("{}", num_attrs)));
+    res.push(("Attribute names".to_string(), format!("{:?}", attrs)));
+    res
 }
 
 #[allow(dead_code)]

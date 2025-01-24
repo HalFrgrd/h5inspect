@@ -83,12 +83,30 @@ fn render_object_info(frame: &mut Frame, app: &mut App, area: Rect) {
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded);
     let selected = app.tree_state.selected();
-    let mut text = "Select on the left".to_string();
+    let mut paragraph = Paragraph::new("Select on the left".to_string());
     if !selected.is_empty() {
         // selected is of form: ["/group1", "/group1/dataset1"]
-        text = app.get_text_for(selected);
+        let info = app.get_text_for(selected);
+        if let Some(info) = info {
+            let mut lines = vec![];
+
+            for (key, value) in info {
+                let spacing = " ".repeat(std::cmp::max(
+                    1,
+                    (area.width as usize)
+                        .saturating_sub(key.chars().count() + value.chars().count() + 3),
+                ));
+                lines.push(Line::from(vec![
+                    Span::raw(key),
+                    Span::raw(spacing),
+                    Span::raw(value).style(Style::default().fg(Color::Magenta)),
+                ]));
+            }
+
+            paragraph = Paragraph::new(lines).wrap(Wrap { trim: true });
+        }
     }
-    let paragraph = Paragraph::new(text).wrap(Wrap { trim: true });
+
     frame.render_widget(paragraph.clone().block(object_info), area);
 }
 

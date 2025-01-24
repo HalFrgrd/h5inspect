@@ -92,29 +92,31 @@ impl App {
         Ok(tree_from_group(root_name, root_group))
     }
 
-    pub fn get_text_for(&self, path: &[NodeIdT]) -> String {
+    pub fn get_text_for(&self, path: &[NodeIdT]) -> Option<Vec<(String, String)>> {
         if let Some(tree) = &self.tree {
             match tree.get_selected_node(path) {
                 Some(ref tree_node) => match &tree_node.hdf5_object {
-                    Some(Hdf5Object::Dataset(dataset)) => h5_utils::get_text_for_dataset(&dataset),
+                    Some(Hdf5Object::Dataset(dataset)) => {
+                        Some(h5_utils::get_text_for_dataset(&dataset))
+                    }
                     Some(Hdf5Object::Group(group)) => {
-                        let text = h5_utils::get_text_for_group(&group);
-                        let size = tree_node.recursive_data_size;
-                        format!("{} {}", text, size)
+                        Some(h5_utils::get_text_for_group(&group))
+                        // let size = tree_node.recursive_data_size;
+                        // format!("{} {}", text, size)
                     }
                     None => {
                         debug!("No hdf5 object found at path {:?}", path);
-                        "".to_string()
+                        None
                     }
                 },
                 None => {
                     debug!("Couldn't find object at path {:?}", path);
-                    "".to_string()
+                    None
                 }
             }
         } else {
             debug!("No tree found");
-            "".to_string()
+            None
         }
     }
 
