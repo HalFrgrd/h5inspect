@@ -91,11 +91,12 @@ fn render_object_info(frame: &mut Frame, app: &mut App, area: Rect) {
             let mut lines = vec![];
 
             for (key, value) in info {
-                let spacing = " ".repeat(std::cmp::max(
-                    1,
-                    (area.width as usize)
-                        .saturating_sub(key.chars().count() + value.chars().count() + 3),
-                ));
+                // let spacing = " ".repeat(std::cmp::max(
+                //     1,
+                //     (area.width as usize)
+                //         .saturating_sub(key.chars().count() + value.chars().count() + 3),
+                // ));
+                let spacing = " ".repeat(24_usize.saturating_sub(key.chars().count()));
                 lines.push(Line::from(vec![
                     Span::raw(key),
                     Span::raw(spacing),
