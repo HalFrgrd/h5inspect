@@ -14,8 +14,9 @@ use tui_tree_widget::Tree as WidgetTreeRoot;
 use tui_tree_widget::TreeItem as WidgetTreeItem;
 
 use std::hash::Hash;
-const STYLE_HIGHLIGHT: Style = Style::new().bg(Color::Gray);
-const STYLE_EXTRA_INFO: Style = Style::new().fg(Color::DarkGray);
+const STYLE_HIGHLIGHT: Style = Style::new().bg(Color::DarkGray);
+const STYLE_DEFAULT_TEXT: Style = Style::new().fg(Color::White);
+const STYLE_EXTRA_INFO: Style = Style::new().fg(Color::Gray);
 const STYLE_MATCH: Style = Style::new().fg(Color::Red).add_modifier(Modifier::BOLD);
 
 pub fn ui(frame: &mut Frame, app: &mut App) {
@@ -152,6 +153,7 @@ fn render_tree(frame: &mut Frame, app: &mut App, area: Rect) {
 
                 let tree_widget = WidgetTreeRoot::new(&filtered_items)
                     .expect("all item identifiers are unique")
+                    .style(STYLE_DEFAULT_TEXT)
                     .highlight_style(STYLE_HIGHLIGHT)
                     .block(tree_block);
 
@@ -182,7 +184,7 @@ fn render_logger(frame: &mut Frame, area: Rect) {
     let logger_widget = tui_logger::TuiLoggerWidget::default()
         .block(
             Block::bordered()
-                .title("Logs (toggle with 'g')")
+                .title("Logs (toggle with '?')")
                 .borders(Borders::ALL)
                 .border_type(BorderType::Rounded),
         )

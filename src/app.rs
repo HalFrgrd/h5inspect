@@ -198,6 +198,13 @@ impl App {
                 }
             }
             KeyCode::Char('g') => {
+                // it's a lot easier to go the first one this way than to use "gg" like in vim
+                self.tree_state.select_first();
+            }
+            KeyCode::Char('G') => {
+                self.tree_state.select_last();
+            }
+            KeyCode::Char('?') => {
                 self.show_logs = !self.show_logs;
             }
             KeyCode::PageDown => {
