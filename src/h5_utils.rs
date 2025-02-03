@@ -1,5 +1,6 @@
 use hdf5::{File, Result};
 use hdf5_metno as hdf5;
+use hdf5_metno::types::FixedUnicode;
 use ndarray::Array2;
 use std::path::PathBuf;
 
@@ -46,6 +47,7 @@ pub fn get_text_for_dataset(dataset: &hdf5::Dataset) -> Vec<(String, String)> {
     let shape = dataset.shape();
     let datatype = dataset
         .dtype()
+        .map(|s| s.to_descriptor())
         .map(|s| format!("{:?}", s))
         .unwrap_or_else(|_| "unknown".to_string());
     let space = dataset
@@ -147,6 +149,14 @@ pub fn generate_dummy_file() -> Result<()> {
         .shape((ny, nx))
         .create("something")?;
     group1_d1.write(&arr)?;
+
+    // Create a dataset with variable-length strings
+    let dataset: hdf5::Dataset = group1
+        .new_dataset::<FixedUnicode<5>>()
+        .create("string_dataset")?;
+
+    // Write data to the dataset
+    dataset.write_scalar(&unsafe { FixedUnicode::<5>::from_str_unchecked("asdfg") })?;
 
     let group2 = group1.create_group("group2")?;
     let group2_d1 = group2
