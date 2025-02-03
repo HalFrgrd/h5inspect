@@ -47,7 +47,7 @@ pub fn get_text_for_dataset(dataset: &hdf5::Dataset) -> Vec<(String, String)> {
     let shape = dataset.shape();
     let datatype = dataset
         .dtype()
-        .map(|s| s.to_descriptor())
+        .and_then(|s| s.to_descriptor())
         .map(|s| format!("{:?}", s))
         .unwrap_or_else(|_| "unknown".to_string());
     let space = dataset
