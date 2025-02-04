@@ -225,6 +225,23 @@ pub fn open_file(file_path: &PathBuf) -> Result<hdf5::File> {
         return split_file;
     }
 
+    let mut clean_path = file_path.clone();
+    if let Some(file_name) = file_path.file_name().and_then(|n| n.to_str()) {
+        if file_name.ends_with("-m.h5") {
+            clean_path.set_file_name(&file_name[..file_name.len() - 5]);
+        } else if file_name.ends_with("-r.h5") {
+            clean_path.set_file_name(&file_name[..file_name.len() - 5]);
+        }
+    }
+
+    let split_file = hdf5::File::with_options()
+        .with_fapl(|p| p.split_options("-m.h5", "-r.h5"))
+        .open(clean_path);
+
+    if split_file.is_ok() {
+        return split_file;
+    }
+
     if !file_path.exists() {
         return Err(format!("File path doesn't exist: {file_path:?}").into());
     }
