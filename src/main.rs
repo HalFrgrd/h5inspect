@@ -13,7 +13,7 @@ mod tree;
 mod ui;
 
 fn main() -> Result<(), Box<dyn Error>> {
-    crate::h5_utils::generate_dummy_file()?;
+    // crate::h5_utils::generate_dummy_file()?;
     let matches = Command::new("h5inspect")
         .author("Hal Frigaard")
         .about("Simple TUI to inspect h5 files")
