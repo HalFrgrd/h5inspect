@@ -92,7 +92,6 @@ fn render_object_info(frame: &mut Frame, app: &mut App, area: Rect) {
             let mut lines = vec![];
 
             for (key, value) in info {
-
                 let lines_in_value: Vec<_> = value.split('\n').map(|s| s.to_string()).collect();
                 let key_width = 24_usize;
                 let spacing = " ".repeat(key_width.saturating_sub(key.chars().count()));
@@ -101,7 +100,10 @@ fn render_object_info(frame: &mut Frame, app: &mut App, area: Rect) {
                 lines.push(Line::from(vec![
                     Span::raw(key),
                     Span::raw(spacing),
-                    Span::styled(lines_in_value[0].clone(), Style::default().fg(Color::Magenta)),
+                    Span::styled(
+                        lines_in_value[0].clone(),
+                        Style::default().fg(Color::Magenta),
+                    ),
                 ]));
 
                 // Subsequent lines indented

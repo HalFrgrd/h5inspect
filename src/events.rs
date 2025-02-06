@@ -2,8 +2,8 @@ use std::time::Duration;
 
 use crossterm::event::{Event as CrosstermEvent, KeyEvent, MouseEvent};
 use futures::{FutureExt, StreamExt};
+use std::time::Instant;
 use tokio::sync::mpsc;
-
 #[derive(Clone, Copy, Debug)]
 pub enum Event {
     Key(KeyEvent),
@@ -29,6 +29,8 @@ impl EventHandler {
         let handler = tokio::spawn(async move {
             let mut reader = crossterm::event::EventStream::new();
             let mut tick = tokio::time::interval(tick_rate);
+            const SCROLL_COOLDOWN_MS: u128 = 10;
+            let mut last_scroll_time: Option<Instant> = None;
             loop {
                 let tick_delay = tick.tick();
                 let crossterm_event = reader.next().fuse();
@@ -45,7 +47,14 @@ impl EventHandler {
                                 }
                             }
                             CrosstermEvent::Mouse(mouse) => {
-                                sender_clone.send(Event::Mouse(mouse)).unwrap();
+                                if mouse.kind == crossterm::event::MouseEventKind::ScrollDown || mouse.kind == crossterm::event::MouseEventKind::ScrollUp {
+                                    if last_scroll_time.is_none() || last_scroll_time.unwrap().elapsed().as_millis() > SCROLL_COOLDOWN_MS {
+                                        last_scroll_time = Some(Instant::now());
+                                        sender_clone.send(Event::Mouse(mouse)).unwrap();
+                                    }
+                                } else {
+                                    sender_clone.send(Event::Mouse(mouse)).unwrap();
+                                }
                             }
                             CrosstermEvent::Resize(_, _) => {
                                 sender_clone.send(Event::Resize).unwrap();

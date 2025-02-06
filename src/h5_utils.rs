@@ -45,6 +45,10 @@ pub fn datasets(group: &hdf5::Group) -> hdf5::Result<Vec<(String, hdf5::Dataset)
 }
 
 fn get_level_formatted_string(s: &str) -> String {
+    if s.chars().filter(|&c| c == '(' || c == '{').count() <= 1 {
+        return s.to_string();
+    }
+
     let mut level = 0;
     let mut result = String::new();
 
@@ -79,6 +83,11 @@ mod tests {
         let s = "(a(b)c)";
         let result = get_level_formatted_string(s);
         assert_eq!(result, "(\n  a(\n    b\n  )c\n)");
+    }
+
+    #[test]
+    fn test_short_string() {
+        assert_eq!(get_level_formatted_string("a(b)"), "a(b)");
     }
 }
 

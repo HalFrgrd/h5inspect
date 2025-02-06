@@ -379,6 +379,12 @@ impl App {
     fn handle_mouse(&mut self, mouse: crossterm::event::MouseEvent) {
         match mouse.kind {
             MouseEventKind::Down(MouseButton::Left) => self.on_click(mouse.column, mouse.row),
+            MouseEventKind::ScrollDown => {
+                self.tree_state.scroll_down(1);
+            }
+            MouseEventKind::ScrollUp => {
+                self.tree_state.scroll_up(1);
+            }
             _ => {}
         }
     }
