@@ -123,7 +123,7 @@ impl App {
     fn on_click(&mut self, column: u16, row: u16) {
         let position = Position::new(column, row);
 
-        dbg!(&position);
+        log::debug!("clicked at {:?}", position);
 
         if let Some(id) = self.tree_state.rendered_at(position) {
             let arg = id.to_vec();

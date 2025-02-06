@@ -30,13 +30,16 @@ fn main() -> Result<(), Box<dyn Error>> {
     let h5_file_path = std::path::PathBuf::from(h5_file_name);
     tui_logger::init_logger(log::LevelFilter::Trace)?;
     tui_logger::set_default_level(log::LevelFilter::Trace);
+    log::info!("Starting app");
 
     let app = App::new(h5_file_path);
     let runtime = build_runtime();
 
     color_eyre::install()?;
     let terminal = ratatui::init();
+    crossterm::execute!(std::io::stdout(), crossterm::event::EnableMouseCapture)?;
     let res = runtime.block_on(app.run(terminal));
+    crossterm::execute!(std::io::stdout(), crossterm::event::DisableMouseCapture)?;
     ratatui::restore();
     res
 }
