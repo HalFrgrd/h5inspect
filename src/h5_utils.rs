@@ -1,6 +1,7 @@
-use hdf5::{File, Result};
+use hdf5::{File, H5Type, Result};
 use hdf5_metno as hdf5;
 use hdf5_metno::types::FixedUnicode;
+use ndarray::arr2;
 use ndarray::Array2;
 use std::path::PathBuf;
 
@@ -43,6 +44,44 @@ pub fn datasets(group: &hdf5::Group) -> hdf5::Result<Vec<(String, hdf5::Dataset)
     })
 }
 
+fn get_level_formatted_string(s: &str) -> String {
+    let mut level = 0;
+    let mut result = String::new();
+
+    for c in s.chars() {
+        match c {
+            '(' | '{' => {
+                result.push(c);
+                level += 1;
+                result.push('\n');
+                result.push_str(&"  ".repeat(level));
+            }
+            ')' | '}' => {
+                level = level.saturating_sub(1);
+                result.push('\n');
+                result.push_str(&"  ".repeat(level));
+                result.push(c);
+            }
+            _ => result.push(c),
+        }
+    }
+
+    result
+}
+
+// test get_level_formatted_string
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_get_level_formatted_string() {
+        let s = "(a(b)c)";
+        let result = get_level_formatted_string(s);
+        assert_eq!(result, "(\n  a(\n    b\n  )c\n)");
+    }
+}
+
 pub fn get_text_for_dataset(dataset: &hdf5::Dataset) -> Vec<(String, String)> {
     let shape = dataset.shape();
     let datatype = dataset
@@ -50,6 +89,7 @@ pub fn get_text_for_dataset(dataset: &hdf5::Dataset) -> Vec<(String, String)> {
         .and_then(|s| s.to_descriptor())
         .map(|s| format!("{:?}", s))
         .unwrap_or_else(|_| "unknown".to_string());
+    let datatype = get_level_formatted_string(&datatype);
     let space = dataset
         .space()
         .map(|s| format!("{:?}", s))
@@ -111,6 +151,27 @@ pub fn get_text_for_group(group: &hdf5::Group) -> Vec<(String, String)> {
     res
 }
 
+#[derive(H5Type, Clone, PartialEq, Debug)] // register with HDF5
+#[repr(u8)]
+pub enum Color {
+    R = 1,
+    G = 2,
+    B = 3,
+}
+
+#[derive(H5Type, Clone, PartialEq, Debug)] // register with HDF5
+#[repr(C)]
+pub struct Pixel {
+    xy: (i64, i64),
+    color: Color,
+}
+
+impl Pixel {
+    pub fn new(x: i64, y: i64, color: Color) -> Self {
+        Self { xy: (x, y), color }
+    }
+}
+
 #[allow(dead_code)]
 pub fn generate_dummy_file() -> Result<()> {
     let file = File::create("dummy.h5")?;
@@ -157,6 +218,17 @@ pub fn generate_dummy_file() -> Result<()> {
 
     // Write data to the dataset
     dataset.write_scalar(&unsafe { FixedUnicode::<5>::from_str_unchecked("asdfg") })?;
+
+    let builder = group1.new_dataset_builder();
+    let _ds = builder
+        .with_data(&arr2(&[
+            // write a 2-D array of data
+            [Pixel::new(1, 2, Color::R), Pixel::new(2, 3, Color::B)],
+            [Pixel::new(3, 4, Color::G), Pixel::new(4, 5, Color::R)],
+            [Pixel::new(5, 6, Color::B), Pixel::new(6, 7, Color::G)],
+        ]))
+        // finalize and write the dataset
+        .create("pixels")?;
 
     let group2 = group1.create_group("group2")?;
     let group2_d1 = group2

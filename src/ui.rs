@@ -92,20 +92,28 @@ fn render_object_info(frame: &mut Frame, app: &mut App, area: Rect) {
             let mut lines = vec![];
 
             for (key, value) in info {
-                // let spacing = " ".repeat(std::cmp::max(
-                //     1,
-                //     (area.width as usize)
-                //         .saturating_sub(key.chars().count() + value.chars().count() + 3),
-                // ));
-                let spacing = " ".repeat(24_usize.saturating_sub(key.chars().count()));
+
+                let lines_in_value: Vec<_> = value.split('\n').map(|s| s.to_string()).collect();
+                let key_width = 24_usize;
+                let spacing = " ".repeat(key_width.saturating_sub(key.chars().count()));
+
+                // First line with key
                 lines.push(Line::from(vec![
                     Span::raw(key),
                     Span::raw(spacing),
-                    Span::raw(value).style(Style::default().fg(Color::Magenta)),
+                    Span::styled(lines_in_value[0].clone(), Style::default().fg(Color::Magenta)),
                 ]));
+
+                // Subsequent lines indented
+                for line in lines_in_value.iter().skip(1) {
+                    lines.push(Line::from(vec![
+                        Span::raw(" ".repeat(key_width)),
+                        Span::styled(line.clone(), Style::default().fg(Color::Magenta)),
+                    ]));
+                }
             }
 
-            paragraph = Paragraph::new(lines).wrap(Wrap { trim: true });
+            paragraph = Paragraph::new(lines).wrap(Wrap { trim: false });
         }
     }
 
