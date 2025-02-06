@@ -30,7 +30,7 @@ pub fn ui(frame: &mut Frame, app: &mut App) {
     render_tree(frame, app, left_layout[0]);
 
     let right_layout =
-        Layout::vertical([Constraint::Percentage(30), Constraint::Min(0)]).split(chunks[1]);
+        Layout::vertical([Constraint::Percentage(50), Constraint::Min(0)]).split(chunks[1]);
 
     if app.show_logs {
         render_object_info(frame, app, right_layout[0]);
@@ -41,7 +41,6 @@ pub fn ui(frame: &mut Frame, app: &mut App) {
 
     app.set_last_object_info_area(right_layout[0]);
     app.set_last_tree_area(left_layout[0]);
-
 }
 impl<IdT> tree::TreeNode<IdT>
 where
@@ -126,7 +125,13 @@ fn render_object_info(frame: &mut Frame, app: &mut App, area: Rect) {
     let num_lines_when_rendered: u16 = paragraph.line_count(area.width).try_into().unwrap();
     let max_scroll_state = num_lines_when_rendered.saturating_sub(area.height);
     app.object_info_scroll_state = app.object_info_scroll_state.clamp(0, max_scroll_state);
-    frame.render_widget(paragraph.clone().block(object_info).scroll((app.object_info_scroll_state, 0)), area);
+    frame.render_widget(
+        paragraph
+            .clone()
+            .block(object_info)
+            .scroll((app.object_info_scroll_state, 0)),
+        area,
+    );
 }
 
 fn render_search(frame: &mut Frame, app: &mut App, area: Rect) {
@@ -167,7 +172,6 @@ fn render_tree(frame: &mut Frame, app: &mut App, area: Rect) {
         Some(_) => match &app.filtered_tree {
             Some(filtered_tree) => {
                 let filtered_items = [filtered_tree.into_tree_item()];
-
                 let tree_widget = WidgetTreeRoot::new(&filtered_items)
                     .expect("all item identifiers are unique")
                     .style(STYLE_DEFAULT_TEXT)

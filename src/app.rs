@@ -29,6 +29,7 @@ pub struct App {
     running: bool,
     pub h5_file_path: PathBuf,
     pub tree_state: tui_tree_widget::TreeState<NodeIdT>,
+    pub tree_state_last_rendered_selected: Option<Vec<NodeIdT>>,
     pub tree: Option<TreeNode<NodeIdT>>,
     pub filtered_tree: Option<TreeNode<NodeIdT>>,
     pub search_query_left: String,
@@ -51,6 +52,7 @@ impl App {
             running: true,
             h5_file_path,
             tree_state: tui_tree_widget::TreeState::default(),
+            tree_state_last_rendered_selected: None,
             tree: None,
             filtered_tree: None,
             search_query_left: String::new(),
@@ -338,7 +340,14 @@ impl App {
         let mut events = events::EventHandler::new();
 
         while self.running {
+            if let Some(last_selected) = &self.tree_state_last_rendered_selected {
+                if last_selected != self.tree_state.selected() {
+                    // if the selected node has changed, reset the scroll state
+                    self.object_info_scroll_state = 0;
+                }
+            }
             terminal.draw(|frame| ui(frame, &mut self))?;
+            self.tree_state_last_rendered_selected = Some(self.tree_state.selected().to_vec());
 
             tokio::select! {
                 Some(event) = events.receiver.recv() => {
@@ -395,16 +404,28 @@ impl App {
         match mouse.kind {
             MouseEventKind::Down(MouseButton::Left) => self.on_click(mouse.column, mouse.row),
             MouseEventKind::ScrollDown => {
-                if self.last_object_info_area.contains(Position::new(mouse.column, mouse.row)) {
+                if self
+                    .last_object_info_area
+                    .contains(Position::new(mouse.column, mouse.row))
+                {
                     self.object_info_scroll_state = self.object_info_scroll_state.saturating_add(1);
-                } else if self.last_tree_area.contains(Position::new(mouse.column, mouse.row)) {
+                } else if self
+                    .last_tree_area
+                    .contains(Position::new(mouse.column, mouse.row))
+                {
                     self.tree_state.scroll_down(1);
                 }
             }
             MouseEventKind::ScrollUp => {
-                if self.last_object_info_area.contains(Position::new(mouse.column, mouse.row)) {
+                if self
+                    .last_object_info_area
+                    .contains(Position::new(mouse.column, mouse.row))
+                {
                     self.object_info_scroll_state = self.object_info_scroll_state.saturating_sub(1);
-                } else if self.last_tree_area.contains(Position::new(mouse.column, mouse.row)) {
+                } else if self
+                    .last_tree_area
+                    .contains(Position::new(mouse.column, mouse.row))
+                {
                     self.tree_state.scroll_up(1);
                 }
             }
