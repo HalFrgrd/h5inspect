@@ -38,6 +38,10 @@ pub fn ui(frame: &mut Frame, app: &mut App) {
     } else {
         render_object_info(frame, app, chunks[1]);
     }
+
+    app.set_last_object_info_area(right_layout[0]);
+    app.set_last_tree_area(left_layout[0]);
+
 }
 impl<IdT> tree::TreeNode<IdT>
 where
@@ -119,7 +123,10 @@ fn render_object_info(frame: &mut Frame, app: &mut App, area: Rect) {
         }
     }
 
-    frame.render_widget(paragraph.clone().block(object_info), area);
+    let num_lines_when_rendered: u16 = paragraph.line_count(area.width).try_into().unwrap();
+    let max_scroll_state = num_lines_when_rendered.saturating_sub(area.height);
+    app.object_info_scroll_state = app.object_info_scroll_state.clamp(0, max_scroll_state);
+    frame.render_widget(paragraph.clone().block(object_info).scroll((app.object_info_scroll_state, 0)), area);
 }
 
 fn render_search(frame: &mut Frame, app: &mut App, area: Rect) {

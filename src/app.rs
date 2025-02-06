@@ -5,7 +5,7 @@ use crate::ui::ui;
 use crossterm::event::{MouseButton, MouseEventKind};
 use hdf5_metno as hdf5;
 use ratatui::crossterm::event::{KeyCode, KeyModifiers};
-use ratatui::layout::Position;
+use ratatui::layout::{Position, Rect};
 use std::path::PathBuf;
 
 #[allow(unused_imports)]
@@ -35,6 +35,9 @@ pub struct App {
     pub search_query_right: String,
     pub mode: Mode,
     pub show_logs: bool,
+    pub object_info_scroll_state: u16,
+    pub last_object_info_area: Rect,
+    pub last_tree_area: Rect,
 }
 
 pub enum Mode {
@@ -54,6 +57,9 @@ impl App {
             search_query_right: String::new(),
             mode: Mode::Normal,
             show_logs: cfg!(debug_assertions),
+            object_info_scroll_state: 0,
+            last_object_info_area: Rect::new(0, 0, 0, 0),
+            last_tree_area: Rect::new(0, 0, 0, 0),
         }
     }
 
@@ -309,6 +315,14 @@ impl App {
         }
     }
 
+    pub fn set_last_object_info_area(&mut self, area: Rect) {
+        self.last_object_info_area = area;
+    }
+
+    pub fn set_last_tree_area(&mut self, area: Rect) {
+        self.last_tree_area = area;
+    }
+
     pub async fn run<B: ratatui::backend::Backend>(
         mut self,
         mut terminal: ratatui::Terminal<B>,
@@ -377,13 +391,22 @@ impl App {
     }
 
     fn handle_mouse(&mut self, mouse: crossterm::event::MouseEvent) {
+        log::debug!("mouse event: {:?}", mouse);
         match mouse.kind {
             MouseEventKind::Down(MouseButton::Left) => self.on_click(mouse.column, mouse.row),
             MouseEventKind::ScrollDown => {
-                self.tree_state.scroll_down(1);
+                if self.last_object_info_area.contains(Position::new(mouse.column, mouse.row)) {
+                    self.object_info_scroll_state = self.object_info_scroll_state.saturating_add(1);
+                } else if self.last_tree_area.contains(Position::new(mouse.column, mouse.row)) {
+                    self.tree_state.scroll_down(1);
+                }
             }
             MouseEventKind::ScrollUp => {
-                self.tree_state.scroll_up(1);
+                if self.last_object_info_area.contains(Position::new(mouse.column, mouse.row)) {
+                    self.object_info_scroll_state = self.object_info_scroll_state.saturating_sub(1);
+                } else if self.last_tree_area.contains(Position::new(mouse.column, mouse.row)) {
+                    self.tree_state.scroll_up(1);
+                }
             }
             _ => {}
         }
