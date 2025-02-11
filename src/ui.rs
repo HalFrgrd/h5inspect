@@ -32,14 +32,17 @@ pub fn ui(frame: &mut Frame, app: &mut App) {
     let right_layout =
         Layout::vertical([Constraint::Percentage(50), Constraint::Min(0)]).split(chunks[1]);
 
-    if app.show_logs {
-        render_object_info(frame, app, right_layout[0]);
-        render_logger(frame, right_layout[1]);
+    let object_info_area = if app.show_logs {
+        right_layout[0]
     } else {
-        render_object_info(frame, app, chunks[1]);
-    }
+        chunks[1]
+    };
 
-    app.set_last_object_info_area(right_layout[0]);
+    if app.show_logs {
+        render_logger(frame, right_layout[1]);
+    }
+    render_object_info(frame, app, object_info_area);
+    app.set_last_object_info_area(object_info_area);
     app.set_last_tree_area(left_layout[0]);
 }
 impl<IdT> tree::TreeNode<IdT>
