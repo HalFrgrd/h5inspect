@@ -151,46 +151,74 @@ impl App {
     fn on_keypress_normal_mode(&mut self, keycode: KeyCode) -> () {
         match keycode {
             KeyCode::Left => {
-                self.tree_state.key_left();
+                if self.filtered_tree.is_some() {
+                    self.tree_state.key_left();
+                }
             }
             KeyCode::Char('h') => {
-                self.tree_state.key_left();
+                if self.filtered_tree.is_some() {
+                    self.tree_state.key_left();
+                }
             }
             KeyCode::Up => {
-                self.on_up();
+                if self.filtered_tree.is_some() {
+                    self.on_up();
+                }
             }
             KeyCode::Char('k') => {
-                self.on_up();
+                if self.filtered_tree.is_some() {
+                    self.on_up();
+                }
             }
             KeyCode::Down => {
-                self.on_down();
+                if self.filtered_tree.is_some() {
+                    self.on_down();
+                }
             }
             KeyCode::Char('j') => {
-                self.on_down();
+                if self.filtered_tree.is_some() {
+                    self.on_down();
+                }
             }
             KeyCode::Right => {
-                self.tree_state.key_right();
+                if self.filtered_tree.is_some() {
+                    self.tree_state.key_right();
+                }
             }
             KeyCode::Char('l') => {
-                self.tree_state.key_right();
+                if self.filtered_tree.is_some() {
+                    self.tree_state.key_right();
+                }
             }
             KeyCode::Home => {
-                self.tree_state.select_first();
+                if self.filtered_tree.is_some() {
+                    self.tree_state.select_first();
+                }
             }
             KeyCode::End => {
-                self.tree_state.select_last();
+                if self.filtered_tree.is_some() {
+                    self.tree_state.select_last();
+                }
             }
             KeyCode::Enter => {
-                self.tree_state.toggle_selected();
+                if self.filtered_tree.is_some() {
+                    self.tree_state.toggle_selected();
+                }
             }
             KeyCode::Char('c') => {
-                self.tree_state.toggle_selected();
+                if self.filtered_tree.is_some() {
+                    self.tree_state.toggle_selected();
+                }
             }
             KeyCode::Tab => {
-                self.on_tab();
+                if self.filtered_tree.is_some() {
+                    self.on_tab();
+                }
             }
             KeyCode::BackTab => {
-                self.on_shift_tab();
+                if self.filtered_tree.is_some() {
+                    self.on_shift_tab();
+                }
             }
             KeyCode::Char('f') => {
                 if let Some(tree) = &self.tree {
@@ -206,24 +234,32 @@ impl App {
                 }
             }
             KeyCode::Char('g') => {
-                // it's a lot easier to go the first one this way than to use "gg" like in vim
-                self.tree_state.select_first();
+                if self.filtered_tree.is_some() {
+                    // it's a lot easier to go the first one this way than to use "gg" like in vim
+                    self.tree_state.select_first();
+                }
             }
             KeyCode::Char('G') => {
-                self.tree_state.select_last();
+                if self.filtered_tree.is_some() {
+                    self.tree_state.select_last();
+                }
             }
             KeyCode::Char('?') => {
                 self.show_logs = !self.show_logs;
             }
             KeyCode::PageDown => {
-                self.tree_state.select_relative(|current| {
-                    current.map_or(0, |current| current.saturating_add(50))
-                });
+                if self.filtered_tree.is_some() {
+                    self.tree_state.select_relative(|current| {
+                        current.map_or(0, |current| current.saturating_add(50))
+                    });
+                }
             }
             KeyCode::PageUp => {
-                self.tree_state.select_relative(|current| {
-                    current.map_or(0, |current| current.saturating_sub(50))
-                });
+                if self.filtered_tree.is_some() {
+                    self.tree_state.select_relative(|current| {
+                        current.map_or(0, |current| current.saturating_sub(50))
+                    });
+                }
             }
             _ => {}
         }
@@ -321,20 +357,25 @@ impl App {
     }
 
     fn update_selected_tree_item(&mut self) {
-        if let Some(filtered_tree) = &self.filtered_tree {
-            let nothing_selected = self.tree_state.selected().is_empty();
-            let selected_item = filtered_tree.get_selected_node(&self.tree_state.selected());
-            let selected_item_is_in_tree = selected_item.is_some();
-            let selected_item_is_direct_match = selected_item.map_or(false, |t| t.is_direct_match);
+        match &self.filtered_tree {
+            Some(filtered_tree) => {
+                let nothing_selected = self.tree_state.selected().is_empty();
+                let selected_item = filtered_tree.get_selected_node(&self.tree_state.selected());
+                let selected_item_is_in_tree = selected_item.is_some();
+                let selected_item_is_direct_match = selected_item.map_or(false, |t| t.is_direct_match);
 
-            if nothing_selected || !selected_item_is_in_tree || !selected_item_is_direct_match {
-                let first_match = filtered_tree.path_to_first_match();
-                self.tree_state.select(first_match.clone());
-                for i in 0..first_match.len() {
-                    self.tree_state.open(first_match[0..i].to_vec());
+                if nothing_selected || !selected_item_is_in_tree || !selected_item_is_direct_match {
+                    let first_match = filtered_tree.path_to_first_match();
+                    self.tree_state.select(first_match.clone());
+                    for i in 0..first_match.len() {
+                        self.tree_state.open(first_match[0..i].to_vec());
+                    }
                 }
+                self.tree_state.scroll_selected_into_view();
             }
-            self.tree_state.scroll_selected_into_view();
+            None => {
+                self.tree_state.select(vec![]);
+            }
         }
     }
 
