@@ -507,6 +507,7 @@ dependencies = [
  "log",
  "ndarray",
  "ratatui",
+ "regex",
  "tokio",
  "tui-logger",
  "tui-tree-widget",

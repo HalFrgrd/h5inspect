@@ -44,65 +44,26 @@ pub fn datasets(group: &hdf5::Group) -> hdf5::Result<Vec<(String, hdf5::Dataset)
     })
 }
 
-fn get_level_formatted_string(s: &str) -> String {
-    if s.chars().filter(|&c| c == '(' || c == '{').count() <= 1 {
-        return s.to_string();
-    }
+use regex::Regex;
 
-    let mut level = 0;
-    let mut result = String::new();
+fn get_datatype_string(datatype: hdf5::Datatype) -> String {
+    const SHORT_LINE: &str = r"\(\n\s+(\S{0,5}),\n\s+\)";
+    let short_line = Regex::new(SHORT_LINE).unwrap();
 
-    for c in s.chars() {
-        match c {
-            '(' | '{' => {
-                result.push(c);
-                level += 1;
-                result.push('\n');
-                result.push_str(&"  ".repeat(level));
-            }
-            ')' | '}' => {
-                level = level.saturating_sub(1);
-                result.push('\n');
-                result.push_str(&"  ".repeat(level));
-                result.push(c);
-            }
-            _ => result.push(c),
-        }
-    }
-
-    result
-}
-
-// test get_level_formatted_string
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_get_level_formatted_string() {
-        let s = "(a(b)c)";
-        let result = get_level_formatted_string(s);
-        assert_eq!(result, "(\n  a(\n    b\n  )c\n)");
-    }
-
-    #[test]
-    fn test_short_string() {
-        assert_eq!(get_level_formatted_string("a(b)"), "a(b)");
-    }
+    datatype
+        .to_descriptor()
+        .map(|s| format!("{:#?}", s))
+        .map(|s| short_line.replace_all(&s, "($1)").to_string())
+        .unwrap_or("unknown".to_string())
 }
 
 pub fn get_text_for_dataset(dataset: &hdf5::Dataset) -> Vec<(String, String)> {
     let shape = dataset.shape();
-    let datatype = dataset
-        .dtype()
-        .and_then(|s| s.to_descriptor())
-        .map(|s| format!("{:?}", s))
-        .unwrap_or_else(|_| "unknown".to_string());
-    let datatype = get_level_formatted_string(&datatype);
+    let datatype = dataset.dtype().map(get_datatype_string).unwrap_or("unknown".to_string());
     let space = dataset
         .space()
         .map(|s| format!("{:?}", s))
-        .unwrap_or_else(|_| "unknown".to_string());
+        .unwrap_or("unknown".to_string());
     let chunks = dataset.chunk();
     let chunk_info = match chunks {
         Some(chunks) => format!("Chunked ({:?})", chunks),
