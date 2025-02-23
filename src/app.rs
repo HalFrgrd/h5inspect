@@ -248,21 +248,42 @@ impl App {
             .select_relative(|x| x.map_or(0, |current| current.saturating_sub(1)));
     }
 
-    fn on_keypress_search_mode(&mut self, keycode: KeyCode) {
+    fn on_keypress_search_mode(&mut self, key: crossterm::event::KeyEvent) {
+        let keycode = key.code;
         let mut refresh_filtered_tree = true;
         match keycode {
             KeyCode::Char(to_insert) => {
                 self.search_query_left.push(to_insert);
             }
             KeyCode::Left => {
-                self.search_query_left
-                    .pop()
-                    .map(|c| self.search_query_right.push(c));
+                if key.modifiers.contains(KeyModifiers::CONTROL) {
+                    // Move cursor to start of previous word
+                    while let Some(c) = self.search_query_left.pop() {
+                        self.search_query_right.push(c);
+                        if c.is_whitespace() {
+                            break;
+                        }
+                    }
+                } else {
+                    self.search_query_left
+                        .pop()
+                        .map(|c| self.search_query_right.push(c));
+                }
             }
             KeyCode::Right => {
-                self.search_query_right
-                    .pop()
-                    .map(|c| self.search_query_left.push(c));
+                if key.modifiers.contains(KeyModifiers::CONTROL) {
+                    // Move cursor to start of next word
+                    while let Some(c) = self.search_query_right.pop() {
+                        self.search_query_left.push(c);
+                        if c.is_whitespace() {
+                            break;
+                        }
+                    }
+                } else {
+                    self.search_query_right
+                        .pop()
+                        .map(|c| self.search_query_left.push(c));
+                }
             }
             KeyCode::Home => self
                 .search_query_right
@@ -391,8 +412,8 @@ impl App {
                     KeyCode::Esc | KeyCode::Enter => {
                         self.mode = Mode::Normal;
                     }
-                    other => {
-                        self.on_keypress_search_mode(other);
+                    _ => {
+                        self.on_keypress_search_mode(key);
                     }
                 },
             }

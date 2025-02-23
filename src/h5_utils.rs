@@ -4,6 +4,7 @@ use hdf5_metno::types::FixedUnicode;
 use ndarray::arr2;
 use ndarray::Array2;
 use std::path::PathBuf;
+use num_format::{Locale, ToFormattedString};
 
 // Calling group.name() or dataset.name() was very slow for some reason.
 // But group.member_names() was fast.
@@ -93,9 +94,9 @@ pub fn get_text_for_dataset(dataset: &hdf5::Dataset) -> Vec<(String, String)> {
     res.push(("Compression".to_string(), compression_info));
     res.push((
         "Storage size".to_string(),
-        format!("{} bytes", storage_size),
+        format!("{} bytes", storage_size.to_formatted_string(&Locale::en).replace(",", "_")),
     ));
-    res.push(("Data size".to_string(), format!("{} bytes", data_size)));
+    res.push(("Data size".to_string(), format!("{} bytes", data_size.to_formatted_string(&Locale::en).replace(",", "_"))));
     res.push((
         "Compression ratio".to_string(),
         format!("{:.2}", compression_ratio),
