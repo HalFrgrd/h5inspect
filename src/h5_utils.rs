@@ -47,7 +47,7 @@ pub fn datasets(group: &hdf5::Group) -> hdf5::Result<Vec<(String, hdf5::Dataset)
 use regex::Regex;
 
 fn get_datatype_string(datatype: hdf5::Datatype) -> String {
-    const SHORT_LINE: &str = r"\(\n\s+(\S{0,5}),\n\s+\)";
+    const SHORT_LINE: &str = r"\(\n\s*(\S{0,5}),\n\s*\)";
     let short_line = Regex::new(SHORT_LINE).unwrap();
 
     datatype

@@ -16,8 +16,8 @@ use tui_tree_widget::TreeItem as WidgetTreeItem;
 use std::hash::Hash;
 const STYLE_HIGHLIGHT: Style = Style::new().bg(Color::DarkGray);
 const STYLE_DEFAULT_TEXT: Style = Style::new().fg(Color::White);
-const STYLE_EXTRA_INFO: Style = Style::new().fg(Color::Gray);
 const STYLE_MATCH: Style = Style::new().fg(Color::Red).add_modifier(Modifier::BOLD);
+const STYLE_MAGENTA: Style = Style::new().fg(Color::Magenta);
 
 pub fn ui(frame: &mut Frame, app: &mut App) {
     let chunks =
@@ -75,8 +75,8 @@ where
         if num_children > 0 {
             formatted_text.push_span(Span::styled(
                 format!(" ({})", num_children),
-                STYLE_EXTRA_INFO,
-            ));
+                STYLE_MAGENTA,
+            ))
         }
 
         WidgetTreeItem::new(self.id(), formatted_text, children)
@@ -108,7 +108,7 @@ fn render_object_info(frame: &mut Frame, app: &mut App, area: Rect) {
                     Span::raw(spacing),
                     Span::styled(
                         lines_in_value[0].clone(),
-                        Style::default().fg(Color::Magenta),
+                        STYLE_MAGENTA,
                     ),
                 ]));
 
@@ -116,7 +116,7 @@ fn render_object_info(frame: &mut Frame, app: &mut App, area: Rect) {
                 for line in lines_in_value.iter().skip(1) {
                     lines.push(Line::from(vec![
                         Span::raw(" ".repeat(key_width)),
-                        Span::styled(line.clone(), Style::default().fg(Color::Magenta)),
+                        Span::styled(line.clone(), STYLE_MAGENTA),
                     ]));
                 }
             }
