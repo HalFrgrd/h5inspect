@@ -88,7 +88,6 @@ pub fn get_text_for_dataset(dataset: &hdf5::Dataset) -> Vec<(String, String)> {
 
     res.push(("Path".to_string(), dataset.name().to_string()));
     res.push(("Shape".to_string(), format!("{:?}", shape)));
-    res.push(("Datatype".to_string(), datatype));
     res.push(("Space".to_string(), space));
     res.push(("Storage".to_string(), chunk_info));
     res.push(("Compression".to_string(), compression_info));
@@ -101,6 +100,7 @@ pub fn get_text_for_dataset(dataset: &hdf5::Dataset) -> Vec<(String, String)> {
         "Compression ratio".to_string(),
         format!("{:.2}", compression_ratio),
     ));
+    res.push(("Datatype".to_string(), datatype));
     res
 }
 
