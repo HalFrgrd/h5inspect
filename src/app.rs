@@ -39,6 +39,7 @@ pub struct App {
     pub object_info_scroll_state: u16,
     pub last_object_info_area: Rect,
     pub last_tree_area: Rect,
+    pub last_search_query_area: Rect,
 }
 
 pub enum Mode {
@@ -62,6 +63,7 @@ impl App {
             object_info_scroll_state: 0,
             last_object_info_area: Rect::new(0, 0, 0, 0),
             last_tree_area: Rect::new(0, 0, 0, 0),
+            last_search_query_area: Rect::new(0, 0, 0, 0),
         }
     }
 
@@ -132,6 +134,10 @@ impl App {
         let position = Position::new(column, row);
 
         log::debug!("clicked at {:?}", position);
+
+        if !self.last_search_query_area.contains(position) {
+            self.mode = Mode::Normal;
+        }
 
         if let Some(id) = self.tree_state.rendered_at(position) {
             let arg = id.to_vec();
@@ -385,6 +391,10 @@ impl App {
 
     pub fn set_last_tree_area(&mut self, area: Rect) {
         self.last_tree_area = area;
+    }
+
+    pub fn set_last_search_query_area(&mut self, area: Rect) {
+        self.last_search_query_area = area;
     }
 
     pub async fn run<B: ratatui::backend::Backend>(

@@ -44,6 +44,7 @@ pub fn ui(frame: &mut Frame, app: &mut App) {
     render_object_info(frame, app, object_info_area);
     app.set_last_object_info_area(object_info_area);
     app.set_last_tree_area(left_layout[0]);
+    app.set_last_search_query_area(left_layout[1]);
 }
 impl<IdT> tree::TreeNode<IdT>
 where
