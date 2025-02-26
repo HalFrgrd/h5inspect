@@ -227,17 +227,7 @@ impl App {
                 }
             }
             KeyCode::Char('f') => {
-                if let Some(tree) = &self.tree {
-                    let mut to_visit = vec![(tree, vec![tree.id()])];
-                    while let Some((current, id_path)) = to_visit.pop() {
-                        self.tree_state.open(id_path.clone());
-                        to_visit.extend(current.children().iter().map(|c| {
-                            let mut id_path = id_path.clone();
-                            id_path.push(c.id());
-                            (c, id_path)
-                        }));
-                    }
-                }
+                self.open_all_tree_nodes();
             }
             KeyCode::Char('g') => {
                 if self.filtered_tree.is_some() {
@@ -397,6 +387,20 @@ impl App {
         self.last_search_query_area = area;
     }
 
+    fn open_all_tree_nodes(&mut self) {
+        if let Some(tree) = &self.tree {
+            let mut to_visit = vec![(tree, vec![tree.id()])];
+            while let Some((current, id_path)) = to_visit.pop() {
+                self.tree_state.open(id_path.clone());
+                to_visit.extend(current.children().iter().map(|c| {
+                    let mut id_path = id_path.clone();
+                    id_path.push(c.id());
+                    (c, id_path)
+                }));
+            }
+        }
+    }
+
     pub async fn run<B: ratatui::backend::Backend>(
         mut self,
         mut terminal: ratatui::Terminal<B>,
@@ -432,7 +436,8 @@ impl App {
                 }
                 Some(tree) = rx.recv() => {
                     self.tree = Some(tree);
-                    self.tree_state.open(vec![self.tree.as_ref().unwrap().id()]);
+                    // self.tree_state.open(vec![self.tree.as_ref().unwrap().id()]);
+                    self.open_all_tree_nodes();
                     self.update_filtered_tree();
                 }
             }
