@@ -139,8 +139,12 @@ impl App {
 
         log::debug!("clicked at {:?}", position);
 
-        if !self.last_search_query_area.contains(position) {
+        if self.last_tree_area.contains(position) {
             self.mode = Mode::Normal;
+        } else if self.last_object_info_area.contains(position) {
+            self.mode = Mode::ObjectInfoInspecting;
+        } else if self.last_search_query_area.contains(position) {
+            self.mode = Mode::SearchQueryEditing;
         }
 
         if let Some(id) = self.tree_state.rendered_at(position) {
@@ -478,7 +482,7 @@ impl App {
                     }
                 },
                 Mode::ObjectInfoInspecting => {
-                    // TODO: scrolldown on keypress 
+                    // TODO: scrolldown on keypress
                 }
             }
         }
@@ -494,6 +498,7 @@ impl App {
                     .contains(Position::new(mouse.column, mouse.row))
                 {
                     self.object_info_scroll_state = self.object_info_scroll_state.saturating_add(1);
+                    self.mode = Mode::ObjectInfoInspecting;
                 } else if self
                     .last_tree_area
                     .contains(Position::new(mouse.column, mouse.row))
@@ -507,6 +512,7 @@ impl App {
                     .contains(Position::new(mouse.column, mouse.row))
                 {
                     self.object_info_scroll_state = self.object_info_scroll_state.saturating_sub(1);
+                    self.mode = Mode::ObjectInfoInspecting;
                 } else if self
                     .last_tree_area
                     .contains(Position::new(mouse.column, mouse.row))
