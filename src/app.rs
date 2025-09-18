@@ -6,7 +6,6 @@ use crossterm::event::{MouseButton, MouseEventKind};
 use hdf5_metno as hdf5;
 use ratatui::crossterm::event::{KeyCode, KeyModifiers};
 use ratatui::layout::{Position, Rect};
-use ratatui::widgets::ScrollbarState;
 use std::path::PathBuf;
 
 #[allow(unused_imports)]
@@ -41,7 +40,6 @@ pub struct App {
     pub last_object_info_area: Rect,
     pub last_tree_area: Rect,
     pub last_search_query_area: Rect,
-    pub tree_scroll_bar_state: ScrollbarState,
 }
 
 pub enum Mode {
@@ -67,7 +65,6 @@ impl App {
             last_object_info_area: Rect::new(0, 0, 0, 0),
             last_tree_area: Rect::new(0, 0, 0, 0),
             last_search_query_area: Rect::new(0, 0, 0, 0),
-            tree_scroll_bar_state: ScrollbarState::new(50),
         }
     }
 
@@ -347,6 +344,15 @@ impl App {
         }
     }
 
+    fn on_keypress_object_info_mode(&mut self, keycode: crossterm::event::KeyCode) {
+        match keycode {
+            KeyCode::Down => {
+                self.object_info_scroll_state = self.object_info_scroll_state.saturating_add(1);
+            }
+            _ => {}
+        };
+    }
+
     fn update_filtered_tree(&mut self) {
         let query = &self.search_query_and_cursor().0;
         match &self.tree {
@@ -481,9 +487,17 @@ impl App {
                         self.on_keypress_search_mode(key);
                     }
                 },
-                Mode::ObjectInfoInspecting => {
-                    // TODO: scrolldown on keypress
-                }
+                Mode::ObjectInfoInspecting => match key.code {
+                    KeyCode::Char('q') => {
+                        self.running = false;
+                    }
+                    KeyCode::Char('/') => {
+                        self.mode = Mode::SearchQueryEditing;
+                    }
+                    other => {
+                        self.on_keypress_object_info_mode(other);
+                    }
+                },
             }
         }
     }
