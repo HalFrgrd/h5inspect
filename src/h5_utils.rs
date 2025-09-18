@@ -171,17 +171,121 @@ pub enum Color {
 #[derive(H5Type, Clone, PartialEq, Debug)] // register with HDF5
 #[repr(C)]
 pub struct Pixel {
-    xy: (i64, i64),
+    x: i64,
+    y: i64,
     color: Color,
+    field1: i32,
+    field2: i32,
+    field3: i32,
+    field4: i32,
+    field5: i32,
+    field6: i32,
+    field7: i32,
+    field8: i32,
+    field9: i32,
+    field10: i32,
+    field11: i32,
+    field12: i32,
+    field13: i32,
+    field14: i32,
+    field15: i32,
+    field16: i32,
+    field17: i32,
+    field18: i32,
+    field19: i32,
+    field20: i32,
+    field21: i32,
+    field22: i32,
+    field23: i32,
+    field24: i32,
+    field25: i32,
+    field26: i32,
+    field27: i32,
+    field28: i32,
+    field29: i32,
+    field30: i32,
+    field31: i32,
+    field32: i32,
+    field33: i32,
+    field34: i32,
+    field35: i32,
+    field36: i32,
+    field37: i32,
+    field38: i32,
+    field39: i32,
+    field40: i32,
+    field41: i32,
+    field42: i32,
+    field43: i32,
+    field44: i32,
+    field45: i32,
+    field46: i32,
+    field47: i32,
+    field48: i32,
+    field49: i32,
+    field50: i32,
 }
 
 impl Pixel {
     pub fn new(x: i64, y: i64, color: Color) -> Self {
-        Self { xy: (x, y), color }
+        Self {
+            x,
+            y,
+            color,
+            field1: 0,
+            field2: 0,
+            field3: 0,
+            field4: 0,
+            field5: 0,
+            field6: 0,
+            field7: 0,
+            field8: 0,
+            field9: 0,
+            field10: 0,
+            field11: 0,
+            field12: 0,
+            field13: 0,
+            field14: 0,
+            field15: 0,
+            field16: 0,
+            field17: 0,
+            field18: 0,
+            field19: 0,
+            field20: 0,
+            field21: 0,
+            field22: 0,
+            field23: 0,
+            field24: 0,
+            field25: 0,
+            field26: 0,
+            field27: 0,
+            field28: 0,
+            field29: 0,
+            field30: 0,
+            field31: 0,
+            field32: 0,
+            field33: 0,
+            field34: 0,
+            field35: 0,
+            field36: 0,
+            field37: 0,
+            field38: 0,
+            field39: 0,
+            field40: 0,
+            field41: 0,
+            field42: 0,
+            field43: 0,
+            field44: 0,
+            field45: 0,
+            field46: 0,
+            field47: 0,
+            field48: 0,
+            field49: 0,
+            field50: 0,
+        }
     }
 }
 
-#[allow(dead_code)]
 pub fn generate_dummy_file() -> Result<()> {
     let file = File::create("dummy.h5")?;
 
@@ -228,16 +332,23 @@ pub fn generate_dummy_file() -> Result<()> {
     // Write data to the dataset
     dataset.write_scalar(&unsafe { FixedUnicode::<5>::from_str_unchecked("asdfg") })?;
 
+    use Color::*;
+
     let builder = group1.new_dataset_builder();
-    let _ds = builder
+
+    let ds = builder
         .with_data(&arr2(&[
             // write a 2-D array of data
-            [Pixel::new(1, 2, Color::R), Pixel::new(2, 3, Color::B)],
-            [Pixel::new(3, 4, Color::G), Pixel::new(4, 5, Color::R)],
-            [Pixel::new(5, 6, Color::B), Pixel::new(6, 7, Color::G)],
+            [Pixel::new(1, 2, R), Pixel::new(2, 3, B)],
+            [Pixel::new(3, 4, G), Pixel::new(4, 5, R)],
+            [Pixel::new(5, 6, B), Pixel::new(6, 7, G)],
         ]))
         // finalize and write the dataset
         .create("pixels")?;
+    // create an attr with fixed shape but don't write the data
+    let attr = ds.new_attr::<Color>().shape([3]).create("colors")?;
+    // write the attr data
+    attr.write(&[R, G, B])?;
 
     let group2 = group1.create_group("group2")?;
     let group2_d1 = group2
