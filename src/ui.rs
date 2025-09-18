@@ -6,7 +6,7 @@ use ratatui::text::Span;
 use ratatui::{
     layout::{Constraint, Layout, Position, Rect},
     style::{Color, Style},
-    widgets::{Block, BorderType, Borders, Paragraph, Wrap},
+    widgets::{Block, BorderType, Borders, Paragraph, Wrap, Scrollbar, ScrollbarOrientation, ScrollbarState},
     Frame,
 };
 use tui_logger;
@@ -18,6 +18,7 @@ const STYLE_HIGHLIGHT: Style = Style::new().bg(Color::DarkGray);
 const STYLE_DEFAULT_TEXT: Style = Style::new().fg(Color::White);
 const STYLE_MATCH: Style = Style::new().fg(Color::Red).add_modifier(Modifier::BOLD);
 const STYLE_MAGENTA: Style = Style::new().fg(Color::Magenta);
+const COLOR_BORDER_HIGHLIGHT: Color = Color::Red;
 
 pub fn ui(frame: &mut Frame, app: &mut App) {
     let chunks =
@@ -86,7 +87,9 @@ fn render_object_info(frame: &mut Frame, app: &mut App, area: Rect) {
     let object_info = Block::new()
         .title("Object info")
         .borders(Borders::ALL)
-        .border_type(BorderType::Rounded);
+        .border_type(BorderType::Rounded)
+        .border_style(Style::default().fg(if let Mode::ObjectInfoInspecting = app.mode  {COLOR_BORDER_HIGHLIGHT} else {Color::White}));
+
     let selected = app.tree_state.selected();
     let mut paragraph = Paragraph::new("Select on the left".to_string());
     if !selected.is_empty() {
@@ -136,13 +139,13 @@ fn render_search(frame: &mut Frame, app: &mut App, area: Rect) {
     let search_block = Block::new()
         .title("Fuzzy search (type '/')")
         .borders(Borders::ALL)
-        .border_type(BorderType::Rounded);
+        .border_type(BorderType::Rounded)
+        .border_style(Style::default().fg(if let Mode::SearchQueryEditing = app.mode  {COLOR_BORDER_HIGHLIGHT} else {Color::White}));
 
     let (search_query_text, search_query_cursor_pos) = app.search_query_and_cursor();
     let search_query = Paragraph::new(search_query_text.as_str()).block(search_block);
     frame.render_widget(search_query, area);
     match app.mode {
-        Mode::Normal => {}
         Mode::SearchQueryEditing => {
             frame.set_cursor_position(Position::new(
                 // Draw the cursor at the current position in the input field.
@@ -151,7 +154,8 @@ fn render_search(frame: &mut Frame, app: &mut App, area: Rect) {
                 // Move one line down, from the border to the input line
                 area.y + 1,
             ))
-        }
+        },
+        _ => {}
     }
 }
 
@@ -164,7 +168,9 @@ fn render_tree(frame: &mut Frame, app: &mut App, area: Rect) {
                 .to_string(),
         )
         .borders(Borders::ALL)
-        .border_type(BorderType::Rounded);
+        .border_type(BorderType::Rounded)
+        .border_style(Style::default().fg(if let Mode::Normal = app.mode  {COLOR_BORDER_HIGHLIGHT} else {Color::White}));
+
 
     match &app.tree {
         Some(_) => match &app.filtered_tree {
@@ -177,6 +183,14 @@ fn render_tree(frame: &mut Frame, app: &mut App, area: Rect) {
                     .block(tree_block);
 
                 frame.render_stateful_widget(tree_widget, area, &mut app.tree_state);
+                // app.tree_scroll_bar_state.content_length()
+                // frame.render_stateful_widget(
+                //     Scrollbar::new(ScrollbarOrientation::VerticalRight)
+                //         .begin_symbol(Some("↑"))
+                //         .end_symbol(Some("↓")),
+                //         area,
+                //     &mut app.tree_scroll_bar_state,
+                // );
             }
             None => {
                 frame.render_widget(
@@ -205,7 +219,8 @@ fn render_logger(frame: &mut Frame, area: Rect) {
             Block::bordered()
                 .title("Logs (toggle with '?')")
                 .borders(Borders::ALL)
-                .border_type(BorderType::Rounded),
+                .border_type(BorderType::Rounded)
+                .border_style(Style::default().fg(Color::Green)),
         )
         .output_separator('|')
         .output_timestamp(Some("%F %H:%M:%S%.3f".to_string()))

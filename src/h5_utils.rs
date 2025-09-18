@@ -1,11 +1,9 @@
-use core::fmt;
 use hdf5::{File, H5Type, Result};
 use hdf5_metno as hdf5;
 use hdf5_metno::types::FixedUnicode;
 use ndarray::arr2;
 use ndarray::Array2;
 use num_format::{Locale, ToFormattedString};
-use std::fmt::format;
 use std::path::PathBuf;
 
 // Calling group.name() or dataset.name() was very slow for some reason.
