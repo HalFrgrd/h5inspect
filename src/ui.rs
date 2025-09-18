@@ -133,7 +133,7 @@ fn render_object_info(frame: &mut Frame, app: &mut App, area: Rect) {
     }
 
     let num_lines_when_rendered: u16 = paragraph.line_count(area.width).try_into().unwrap();
-    let max_scroll_state = num_lines_when_rendered.saturating_sub(area.height);
+    let max_scroll_state = num_lines_when_rendered.saturating_sub(area.height) + 3;
     app.object_info_scroll_state = app.object_info_scroll_state.clamp(0, max_scroll_state);
     frame.render_widget(
         paragraph

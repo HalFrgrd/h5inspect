@@ -346,6 +346,9 @@ impl App {
 
     fn on_keypress_object_info_mode(&mut self, keycode: crossterm::event::KeyCode) {
         match keycode {
+            KeyCode::Up => {
+                self.object_info_scroll_state = self.object_info_scroll_state.saturating_sub(1);
+            }
             KeyCode::Down => {
                 self.object_info_scroll_state = self.object_info_scroll_state.saturating_add(1);
             }
