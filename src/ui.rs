@@ -74,10 +74,7 @@ where
 
         let num_children = self.recursive_num_children();
         if num_children > 0 {
-            formatted_text.push_span(Span::styled(
-                format!(" ({})", num_children),
-                STYLE_MAGENTA,
-            ))
+            formatted_text.push_span(Span::styled(format!(" ({})", num_children), STYLE_MAGENTA))
         }
 
         WidgetTreeItem::new(self.id(), formatted_text, children)
@@ -107,10 +104,7 @@ fn render_object_info(frame: &mut Frame, app: &mut App, area: Rect) {
                 lines.push(Line::from(vec![
                     Span::raw(key),
                     Span::raw(spacing),
-                    Span::styled(
-                        lines_in_value[0].clone(),
-                        STYLE_MAGENTA,
-                    ),
+                    Span::styled(lines_in_value[0].clone(), STYLE_MAGENTA),
                 ]));
 
                 // Subsequent lines indented

@@ -1,10 +1,12 @@
+use core::fmt;
 use hdf5::{File, H5Type, Result};
 use hdf5_metno as hdf5;
 use hdf5_metno::types::FixedUnicode;
 use ndarray::arr2;
 use ndarray::Array2;
-use std::path::PathBuf;
 use num_format::{Locale, ToFormattedString};
+use std::fmt::format;
+use std::path::PathBuf;
 
 // Calling group.name() or dataset.name() was very slow for some reason.
 // But group.member_names() was fast.
@@ -45,22 +47,49 @@ pub fn datasets(group: &hdf5::Group) -> hdf5::Result<Vec<(String, hdf5::Dataset)
     })
 }
 
-use regex::Regex;
+fn type_descriptor_to_text(dt: hdf5::types::TypeDescriptor) -> String {
+    match dt {
+        hdf5::types::TypeDescriptor::Compound(ct) => {
+            let mut rep: String = "compound(\n  size: ".into();
+            rep.push_str(&ct.size.to_string());
+            rep.push_str(",\n");
+            rep.push_str("  fields:\n");
+            for field in ct.fields {
+                let field_text = type_descriptor_to_text(field.ty);
 
-fn get_datatype_string(datatype: hdf5::Datatype) -> String {
-    const SHORT_LINE: &str = r"\(\n\s*(\S{0,5}),\n\s*\)";
-    let short_line = Regex::new(SHORT_LINE).unwrap();
+                let prefix_indentation = "    ";
+                let mut lines = field_text.lines();
 
-    datatype
-        .to_descriptor()
-        .map(|s| format!("{:#?}", s))
-        .map(|s| short_line.replace_all(&s, "($1)").to_string())
-        .unwrap_or("unknown".to_string())
+                // Take first line as-is
+                let mut indented = String::new();
+                if let Some(first) = lines.next() {
+                    indented.push_str(first);
+                }
+
+                // Indent the rest
+                for line in lines {
+                    indented.push('\n');
+                    indented.push_str(prefix_indentation);
+                    indented.push_str(line);
+                }
+
+                rep.push_str(&format!(
+                    "{}{}: {}\n",
+                    prefix_indentation, &field.name, &indented
+                ));
+            }
+            rep.push_str(")");
+            rep
+        }
+        non_compound => format!("{}", non_compound),
+    }
 }
 
 pub fn get_text_for_dataset(dataset: &hdf5::Dataset) -> Vec<(String, String)> {
     let shape = dataset.shape();
-    let datatype = dataset.dtype().map(get_datatype_string).unwrap_or("unknown".to_string());
+    // let datatype = dataset.dtyp;e().map(get_datatype_string).unwrap_or("unknown".to_string());
+    let datatype: String =
+        type_descriptor_to_text(dataset.dtype().unwrap().to_descriptor().unwrap());
     let space = dataset
         .space()
         .map(|s| format!("{:?}", s))
@@ -93,9 +122,20 @@ pub fn get_text_for_dataset(dataset: &hdf5::Dataset) -> Vec<(String, String)> {
     res.push(("Compression".to_string(), compression_info));
     res.push((
         "Storage size".to_string(),
-        format!("{} bytes", storage_size.to_formatted_string(&Locale::en).replace(",", "_")),
+        format!(
+            "{} bytes",
+            storage_size
+                .to_formatted_string(&Locale::en)
+                .replace(",", "_")
+        ),
     ));
-    res.push(("Data size".to_string(), format!("{} bytes", data_size.to_formatted_string(&Locale::en).replace(",", "_"))));
+    res.push((
+        "Data size".to_string(),
+        format!(
+            "{} bytes",
+            data_size.to_formatted_string(&Locale::en).replace(",", "_")
+        ),
+    ));
     res.push((
         "Compression ratio".to_string(),
         format!("{:.2}", compression_ratio),

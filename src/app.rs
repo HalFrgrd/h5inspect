@@ -358,7 +358,8 @@ impl App {
                 let nothing_selected = self.tree_state.selected().is_empty();
                 let selected_item = filtered_tree.get_selected_node(&self.tree_state.selected());
                 let selected_item_is_in_tree = selected_item.is_some();
-                let selected_item_is_direct_match = selected_item.map_or(false, |t| t.is_direct_match);
+                let selected_item_is_direct_match =
+                    selected_item.map_or(false, |t| t.is_direct_match);
 
                 if nothing_selected || !selected_item_is_in_tree || !selected_item_is_direct_match {
                     let first_match = filtered_tree.path_to_first_match();
