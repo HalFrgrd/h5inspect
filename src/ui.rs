@@ -6,10 +6,7 @@ use ratatui::text::Span;
 use ratatui::{
     layout::{Constraint, Layout, Position, Rect},
     style::{Color, Style},
-    widgets::{
-        Block, BorderType, Borders, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState,
-        Wrap,
-    },
+    widgets::{Block, BorderType, Borders, Paragraph, Wrap},
     Frame,
 };
 use tui_logger;

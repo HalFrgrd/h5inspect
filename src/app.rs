@@ -151,14 +151,6 @@ impl App {
         }
     }
 
-    fn on_up(&mut self) {
-        self.tree_state.key_up();
-    }
-
-    fn on_down(&mut self) {
-        self.tree_state.key_down();
-    }
-
     fn on_keypress_normal_mode(&mut self, keycode: KeyCode) -> () {
         match keycode {
             KeyCode::Left => {
@@ -171,35 +163,18 @@ impl App {
                     self.tree_state.key_left();
                 }
             }
-            KeyCode::Up => {
+            KeyCode::Up | KeyCode::Char('k') => {
                 if self.filtered_tree.is_some() {
-                    self.on_up();
+                    self.tree_state.key_up();
                 }
             }
-            KeyCode::Char('k') => {
+            KeyCode::Down | KeyCode::Char('j') => {
                 if self.filtered_tree.is_some() {
-                    self.on_up();
+                    self.tree_state.key_down();
                 }
             }
-            KeyCode::Down => {
-                if self.filtered_tree.is_some() {
-                    self.on_down();
-                }
-            }
-            KeyCode::Char('j') => {
-                if self.filtered_tree.is_some() {
-                    self.on_down();
-                }
-            }
-            KeyCode::Right => {
-                if self.filtered_tree.is_some() {
-                    self.tree_state.key_right();
-                }
-            }
-            KeyCode::Char('l') => {
-                if self.filtered_tree.is_some() {
-                    self.tree_state.key_right();
-                }
+            KeyCode::Right | KeyCode::Char('l') => {
+                self.mode = Mode::ObjectInfoInspecting;
             }
             KeyCode::Home => {
                 if self.filtered_tree.is_some() {
@@ -346,11 +321,27 @@ impl App {
 
     fn on_keypress_object_info_mode(&mut self, keycode: crossterm::event::KeyCode) {
         match keycode {
-            KeyCode::Up => {
+            KeyCode::Up | KeyCode::Char('k') => {
                 self.object_info_scroll_state = self.object_info_scroll_state.saturating_sub(1);
             }
-            KeyCode::Down => {
+            KeyCode::Down | KeyCode::Char('j') => {
                 self.object_info_scroll_state = self.object_info_scroll_state.saturating_add(1);
+            }
+            KeyCode::Left | KeyCode::Char('h') => {
+                self.mode = Mode::Normal;
+            }
+            KeyCode::PageDown => {
+                // This gets clamped when the ui figures out how many lines we have
+                self.object_info_scroll_state = self.object_info_scroll_state.saturating_add(50);
+            }
+            KeyCode::PageUp => {
+                self.object_info_scroll_state = self.object_info_scroll_state.saturating_sub(50);
+            }
+            KeyCode::End => {
+                self.object_info_scroll_state = u16::MAX;
+            }
+            KeyCode::Home => {
+                self.object_info_scroll_state = 0;
             }
             _ => {}
         };
