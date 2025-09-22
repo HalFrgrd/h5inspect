@@ -6,7 +6,7 @@ use ratatui::text::Span;
 use ratatui::{
     layout::{Constraint, Layout, Position, Rect},
     style::{Color, Style},
-    widgets::{Block, BorderType, Borders, Paragraph, Wrap},
+    widgets::{Block, BorderType, Borders, Paragraph, Wrap, Scrollbar, ScrollbarOrientation},
     Frame,
 };
 use tui_logger;
@@ -195,7 +195,13 @@ fn render_tree(frame: &mut Frame, app: &mut App, area: Rect) {
                     .expect("all item identifiers are unique")
                     .style(STYLE_DEFAULT_TEXT)
                     .highlight_style(STYLE_HIGHLIGHT)
-                    .block(tree_block);
+                    .block(tree_block)
+                    .experimental_scrollbar(Some(
+                        Scrollbar::new(ScrollbarOrientation::VerticalRight)
+                            .begin_symbol(None)
+                            .track_symbol(None)
+                            .end_symbol(None),
+                    ));
 
                 frame.render_stateful_widget(tree_widget, area, &mut app.tree_state);
                 // app.tree_scroll_bar_state.content_length()
