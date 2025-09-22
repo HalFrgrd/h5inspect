@@ -342,7 +342,10 @@ impl App {
             }
             KeyCode::Home => {
                 self.object_info_scroll_state = 0;
-            }
+            },
+            KeyCode::Char('?') => {
+                self.show_logs = !self.show_logs;
+            },
             _ => {}
         };
     }
