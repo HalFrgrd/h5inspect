@@ -1,11 +1,11 @@
 use hdf5::{File, H5Type, Result};
 use hdf5_metno as hdf5;
 use hdf5_metno::types::FixedUnicode;
+use humansize::{format_size, DECIMAL};
 use ndarray::arr2;
 use ndarray::Array2;
 use num_format::{Locale, ToFormattedString};
 use std::path::PathBuf;
-use humansize::{format_size, DECIMAL};
 
 // Calling group.name() or dataset.name() was very slow for some reason.
 // But group.member_names() was fast.
@@ -124,7 +124,9 @@ pub fn get_text_for_dataset(dataset: &hdf5::Dataset) -> Vec<(String, String)> {
         format!(
             "{} ({} bytes)",
             format_size(storage_size, DECIMAL),
-            storage_size.to_formatted_string(&Locale::en).replace(",", "_")
+            storage_size
+                .to_formatted_string(&Locale::en)
+                .replace(",", "_")
         ),
     ));
     res.push((
