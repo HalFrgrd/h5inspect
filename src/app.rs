@@ -6,6 +6,7 @@ use crossterm::event::{MouseButton, MouseEventKind};
 use hdf5_metno as hdf5;
 use ratatui::crossterm::event::{KeyCode, KeyModifiers};
 use ratatui::layout::{Position, Rect};
+use std::collections::HashMap;
 use std::path::PathBuf;
 
 use futures::FutureExt;
@@ -26,6 +27,12 @@ impl PartialEq for Hdf5Object {
     }
 }
 
+#[derive(Debug)]
+enum AsyncNodeInfo {
+    Pending(tokio::task::JoinHandle<String>),
+    Ready(String),
+}
+
 pub type NodeIdT = hdf5_metno_sys::h5i::hid_t;
 
 pub struct App {
@@ -44,7 +51,7 @@ pub struct App {
     pub last_tree_area: Rect,
     pub last_search_query_area: Rect,
     pub animation_state: u8,
-    pub node_id_to_info_task: Option<tokio::task::JoinHandle<i32>>,
+    node_id_to_info_task: HashMap<NodeIdT, AsyncNodeInfo>,
 }
 
 fn last_chars(s: &str, n: usize) -> &str {
@@ -84,7 +91,7 @@ impl App {
             last_tree_area: Rect::new(0, 0, 0, 0),
             last_search_query_area: Rect::new(0, 0, 0, 0),
             animation_state: 0,
-            node_id_to_info_task: None,
+            node_id_to_info_task: HashMap::new(),
         }
     }
 
@@ -133,22 +140,41 @@ impl App {
                         let mut stats_text =
                             "Loading".to_owned() + &".".repeat((self.animation_state % 4).into());
 
-                        if let Some(handle) = &mut self.node_id_to_info_task {
-                            if let Some(info_result) = handle.now_or_never() {
-                                match info_result {
-                                    Ok(val) => {
-                                        log::debug!("success: {}", val);
-                                        stats_text = format!("{}", val);
+                        let k = &tree_node.id();
+
+                        if let Some(mut node_info) = self.node_id_to_info_task.remove(k) {
+                            match node_info {
+                                AsyncNodeInfo::Pending(ref mut task) => {
+                                    if let Some(info_result) = task.now_or_never() {
+                                        match info_result {
+                                            Ok(val) => {
+                                                log::debug!("success: {}", val);
+                                                self.node_id_to_info_task.insert(
+                                                    k.clone(),
+                                                    AsyncNodeInfo::Ready(val.clone()),
+                                                );
+                                                stats_text = val;
+                                            }
+                                            Err(e) => log::debug!("failed: {}", e),
+                                        }
+                                    } else {
+                                        self.node_id_to_info_task.insert(k.clone(), node_info);
                                     }
-                                    Err(e) => log::debug!("failed: {}", e),
                                 }
-                                self.node_id_to_info_task = None;
+                                AsyncNodeInfo::Ready(val) => {
+                                    self.node_id_to_info_task
+                                        .insert(k.clone(), AsyncNodeInfo::Ready(val.clone()));
+                                    stats_text = val.to_owned();
+                                }
                             }
                         } else {
-                            self.node_id_to_info_task = Some(tokio::task::spawn(async {
-                                tokio::time::sleep(std::time::Duration::from_secs(2)).await;
-                                123123
-                            }))
+                            self.node_id_to_info_task.insert(
+                                k.clone(),
+                                AsyncNodeInfo::Pending(tokio::task::spawn(async {
+                                    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+                                    "asdf".into()
+                                })),
+                            );
                         };
 
                         info.push(("Stats".into(), stats_text));
