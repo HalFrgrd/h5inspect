@@ -122,7 +122,7 @@ pub fn get_text_for_dataset(dataset: &hdf5::Dataset) -> Vec<(String, String)> {
     res.push((
         "Storage size".to_string(),
         format!(
-            "{} ({} bytes)",
+            "{} ({} B)",
             format_size(storage_size, DECIMAL),
             storage_size
                 .to_formatted_string(&Locale::en)
@@ -132,7 +132,7 @@ pub fn get_text_for_dataset(dataset: &hdf5::Dataset) -> Vec<(String, String)> {
     res.push((
         "Data size".to_string(),
         format!(
-            "{} ({} bytes)",
+            "{} ({} B)",
             format_size(data_size, DECIMAL),
             data_size.to_formatted_string(&Locale::en).replace(",", "_")
         ),
