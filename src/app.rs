@@ -101,7 +101,7 @@ impl App {
                 let node_id = dataset.id();
                 children.push(
                     TreeNode::new(node_id, text, vec![])
-                        .set_dataset_size(dataset.size())
+                        .set_storage_dataset_size(dataset.storage_size())
                         .set_hdf5_object(Hdf5Object::Dataset(dataset)),
                 );
             }
@@ -124,9 +124,8 @@ impl App {
                         Some(h5_utils::get_text_for_dataset(&dataset))
                     }
                     Some(Hdf5Object::Group(group)) => {
-                        Some(h5_utils::get_text_for_group(&group))
-                        // let size = tree_node.recursive_data_size;
-                        // format!("{} {}", text, size)
+                        let size = tree_node.recursive_storage_data_size;
+                        Some(h5_utils::get_text_for_group(&group, size))
                     }
                     None => {
                         debug!("No hdf5 object found at path {:?}", path);
@@ -259,12 +258,11 @@ impl App {
         let text = self.search_query_left.clone() + &rev_right;
         let cursor_pos = self.search_query_left.len();
 
-        if cursor_pos > max_len  {
+        if cursor_pos > max_len {
             return (last_chars(&text, max_len).into(), max_len);
         } else {
             return (first_chars(&text, max_len).into(), cursor_pos);
         }
-
     }
 
     fn on_tab(&mut self) -> () {

@@ -120,7 +120,7 @@ pub fn get_text_for_dataset(dataset: &hdf5::Dataset) -> Vec<(String, String)> {
     res.push(("Chunk info".to_string(), chunk_info));
     res.push(("Compression".to_string(), compression_info));
     res.push((
-        "Compressed size".to_string(),
+        "Storage size".to_string(),
         format!(
             "{} ({} B)",
             format_size(storage_size, DECIMAL),
@@ -145,7 +145,7 @@ pub fn get_text_for_dataset(dataset: &hdf5::Dataset) -> Vec<(String, String)> {
     res
 }
 
-pub fn get_text_for_group(group: &hdf5::Group) -> Vec<(String, String)> {
+pub fn get_text_for_group(group: &hdf5::Group, storage_size: u64) -> Vec<(String, String)> {
     let num_groups = group.groups().unwrap_or(vec![]).len();
     let num_datasets = group.datasets().unwrap_or(vec![]).len();
     let attrs = group.attr_names().unwrap_or(vec![]);
@@ -160,6 +160,16 @@ pub fn get_text_for_group(group: &hdf5::Group) -> Vec<(String, String)> {
     ));
     res.push(("Number of attributes".to_string(), format!("{}", num_attrs)));
     res.push(("Attribute names".to_string(), format!("{:?}", attrs)));
+    res.push((
+        "Storage size".to_string(),
+        format!(
+            "{} ({} B)",
+            format_size(storage_size, DECIMAL),
+            storage_size
+                .to_formatted_string(&Locale::en)
+                .replace(",", "_")
+        ),
+    ));
     res
 }
 

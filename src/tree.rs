@@ -13,7 +13,7 @@ where
     text: String,
     children: Vec<TreeNode<IdT>>,
     recursive_num_children: usize,
-    pub recursive_data_size: usize,
+    pub recursive_storage_data_size: u64,
     matching_indices: Vec<usize>,
     pub is_direct_match: bool,
     pub hdf5_object: Option<Hdf5Object>,
@@ -40,25 +40,25 @@ where
             .sum::<usize>()
             + children.len();
 
-        let recursive_data_size: usize = children
+        let recursive_storage_data_size: u64 = children
             .iter()
-            .map(|child| child.recursive_data_size)
-            .sum::<usize>();
+            .map(|child| child.recursive_storage_data_size)
+            .sum::<u64>();
 
         Self {
             id: id.into(),
             text: text.into(),
             children,
             recursive_num_children,
-            recursive_data_size,
+            recursive_storage_data_size,
             matching_indices: indices,
             is_direct_match,
             hdf5_object: None,
         }
     }
 
-    pub fn set_dataset_size(mut self, size: usize) -> Self {
-        self.recursive_data_size = size;
+    pub fn set_storage_dataset_size(mut self, size: u64) -> Self {
+        self.recursive_storage_data_size = size;
         self
     }
 

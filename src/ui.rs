@@ -137,7 +137,7 @@ fn render_object_info(frame: &mut Frame, app: &mut App, area: Rect) {
 
     let mut scrollbar_state = ScrollbarState::default()
         .content_length(max_scroll_state.into())
-        .viewport_content_length( (area.height).into())
+        .viewport_content_length((area.height).into())
         .position(app.object_info_scroll_state.into());
 
     frame.render_widget(
@@ -171,7 +171,8 @@ fn render_search(frame: &mut Frame, app: &mut App, area: Rect) {
             }),
         );
 
-    let (search_query_text, search_query_cursor_pos) = app.search_query_and_cursor((area.width -3) .into());
+    let (search_query_text, search_query_cursor_pos) =
+        app.search_query_and_cursor((area.width - 3).into());
     let search_query = Paragraph::new(search_query_text.as_str()).block(search_block);
     frame.render_widget(search_query, area);
     match app.mode {
