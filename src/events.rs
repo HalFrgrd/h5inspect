@@ -8,7 +8,7 @@ use tokio::sync::mpsc;
 pub enum Event {
     Key(KeyEvent),
     Mouse(MouseEvent),
-    Tick,
+    AnimationTick,
     Resize,
     // TreeUpdate(tree::Tree<tree::NodeIdT>, app::TreeNodeToObject),
 }
@@ -23,7 +23,7 @@ pub struct EventHandler {
 
 impl EventHandler {
     pub fn new() -> Self {
-        let tick_rate = Duration::from_millis(800);
+        let tick_rate = Duration::from_millis(300);
         let (sender, receiver) = mpsc::unbounded_channel();
         let sender_clone = sender.clone();
         let handler = tokio::spawn(async move {
@@ -37,7 +37,7 @@ impl EventHandler {
                 tokio::select! {
                     _ = sender_clone.closed() => break,
                     _ = tick_delay => {
-                        sender_clone.send(Event::Tick).unwrap();
+                        sender_clone.send(Event::AnimationTick).unwrap();
                     }
                     Some(Ok(evt)) = crossterm_event =>{
                         match evt {

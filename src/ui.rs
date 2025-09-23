@@ -98,11 +98,11 @@ fn render_object_info(frame: &mut Frame, app: &mut App, area: Rect) {
             }),
         );
 
-    let selected = app.tree_state.selected();
+    let selected = app.tree_state.selected().to_vec();
     let mut paragraph = Paragraph::new("Select on the left".to_string());
     if !selected.is_empty() {
         // selected is of form: ["/group1", "/group1/dataset1"]
-        let info = app.get_text_for(selected);
+        let info = app.get_text_for(&selected);
         if let Some(info) = info {
             let mut lines = vec![];
 
@@ -199,11 +199,13 @@ fn render_tree(frame: &mut Frame, app: &mut App, area: Rect) {
         )
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
-        .border_style(Style::default().fg(if let SelectionMode::TreeBrowsing = app.mode {
-            COLOR_BORDER_HIGHLIGHT
-        } else {
-            Color::White
-        }));
+        .border_style(
+            Style::default().fg(if let SelectionMode::TreeBrowsing = app.mode {
+                COLOR_BORDER_HIGHLIGHT
+            } else {
+                Color::White
+            }),
+        );
 
     match &app.tree {
         Some(_) => match &app.filtered_tree {

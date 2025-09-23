@@ -8,6 +8,9 @@ use ratatui::crossterm::event::{KeyCode, KeyModifiers};
 use ratatui::layout::{Position, Rect};
 use std::path::PathBuf;
 
+use futures::FutureExt;
+use tokio;
+
 #[allow(unused_imports)]
 use log::*;
 
@@ -40,6 +43,8 @@ pub struct App {
     pub last_object_info_area: Rect,
     pub last_tree_area: Rect,
     pub last_search_query_area: Rect,
+    pub animation_state: u8,
+    pub node_id_to_info_task: Option<tokio::task::JoinHandle<i32>>,
 }
 
 fn last_chars(s: &str, n: usize) -> &str {
@@ -78,6 +83,8 @@ impl App {
             last_object_info_area: Rect::new(0, 0, 0, 0),
             last_tree_area: Rect::new(0, 0, 0, 0),
             last_search_query_area: Rect::new(0, 0, 0, 0),
+            animation_state: 0,
+            node_id_to_info_task: None,
         }
     }
 
@@ -116,12 +123,37 @@ impl App {
         Ok(tree_from_group(root_name, root_group))
     }
 
-    pub fn get_text_for(&self, path: &[NodeIdT]) -> Option<Vec<(String, String)>> {
+    pub fn get_text_for(&mut self, path: &[NodeIdT]) -> Option<Vec<(String, String)>> {
         if let Some(tree) = &self.tree {
             match tree.get_selected_node(path) {
                 Some(ref tree_node) => match &tree_node.hdf5_object {
                     Some(Hdf5Object::Dataset(dataset)) => {
-                        Some(h5_utils::get_text_for_dataset(&dataset))
+                        let mut info = h5_utils::get_text_for_dataset(&dataset);
+
+                        let mut stats_text =
+                            "Loading".to_owned() + &".".repeat((self.animation_state % 4).into());
+
+                        if let Some(handle) = &mut self.node_id_to_info_task {
+                            if let Some(info_result) = handle.now_or_never() {
+                                match info_result {
+                                    Ok(val) => {
+                                        log::debug!("success: {}", val);
+                                        stats_text = format!("{}", val);
+                                    }
+                                    Err(e) => log::debug!("failed: {}", e),
+                                }
+                                self.node_id_to_info_task = None;
+                            }
+                        } else {
+                            self.node_id_to_info_task = Some(tokio::task::spawn(async {
+                                tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+                                123123
+                            }))
+                        };
+
+                        info.push(("Stats".into(), stats_text));
+
+                        Some(info)
                     }
                     Some(Hdf5Object::Group(group)) => {
                         let size = tree_node.recursive_storage_data_size;
@@ -455,7 +487,10 @@ impl App {
             tokio::select! {
                 Some(event) = events.receiver.recv() => {
                     match event {
-                        events::Event::Tick => {}
+                        events::Event::AnimationTick => {
+                            log::debug!("Animation tick");
+                            self.animation_state = self.animation_state.wrapping_add(1);
+                        }
                         events::Event::Key(key) => self.handle_keypress(key),
                         events::Event::Mouse(mouse) => self.handle_mouse(mouse),
                         events::Event::Resize => {}
