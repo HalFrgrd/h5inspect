@@ -1,12 +1,14 @@
 use crate::app::{App, Mode};
 use crate::tree;
+use ratatui::layout::Margin;
 use ratatui::style::Modifier;
 use ratatui::text::Line;
 use ratatui::text::Span;
+use ratatui::widgets::ScrollbarState;
 use ratatui::{
     layout::{Constraint, Layout, Position, Rect},
     style::{Color, Style},
-    widgets::{Block, BorderType, Borders, Paragraph, Wrap, Scrollbar, ScrollbarOrientation},
+    widgets::{Block, BorderType, Borders, Paragraph, Scrollbar, ScrollbarOrientation, Wrap},
     Frame,
 };
 use tui_logger;
@@ -132,12 +134,27 @@ fn render_object_info(frame: &mut Frame, app: &mut App, area: Rect) {
     let num_lines_when_rendered: u16 = paragraph.line_count(area.width).try_into().unwrap();
     let max_scroll_state = num_lines_when_rendered.saturating_sub(area.height) + 3;
     app.object_info_scroll_state = app.object_info_scroll_state.clamp(0, max_scroll_state);
+
+    let mut scrollbar_state = ScrollbarState::default()
+        .content_length(max_scroll_state.into())
+        .viewport_content_length(area.height.into())
+        .position(app.object_info_scroll_state.into());
+
     frame.render_widget(
         paragraph
             .clone()
             .block(object_info)
             .scroll((app.object_info_scroll_state, 0)),
         area,
+    );
+
+    frame.render_stateful_widget(
+        Scrollbar::new(ScrollbarOrientation::VerticalRight)
+            .begin_symbol(None)
+            .track_symbol(None)
+            .end_symbol(None),
+        area,
+        &mut scrollbar_state,
     );
 }
 
@@ -204,14 +221,6 @@ fn render_tree(frame: &mut Frame, app: &mut App, area: Rect) {
                     ));
 
                 frame.render_stateful_widget(tree_widget, area, &mut app.tree_state);
-                // app.tree_scroll_bar_state.content_length()
-                // frame.render_stateful_widget(
-                //     Scrollbar::new(ScrollbarOrientation::VerticalRight)
-                //         .begin_symbol(Some("↑"))
-                //         .end_symbol(Some("↓")),
-                //         area,
-                //     &mut app.tree_scroll_bar_state,
-                // );
             }
             None => {
                 frame.render_widget(
