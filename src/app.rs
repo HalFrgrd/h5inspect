@@ -42,6 +42,19 @@ pub struct App {
     pub last_search_query_area: Rect,
 }
 
+fn last_chars(s: &str, n: usize) -> &str {
+    let len = s.chars().count();
+    let start = len.saturating_sub(n);
+    let idx = s.char_indices().nth(start).map(|(i, _)| i).unwrap_or(0);
+    &s[idx..]
+}
+
+fn first_chars(s: &str, n: usize) -> &str {
+    let mut char_indices = s.char_indices();
+    let idx = char_indices.nth(n).map(|(i, _)| i).unwrap_or(s.len());
+    &s[..idx]
+}
+
 pub enum Mode {
     Normal,
     SearchQueryEditing,
@@ -241,13 +254,17 @@ impl App {
         }
     }
 
-    // TODO does reversing work fine for all utf8 things?
-    pub fn search_query_and_cursor(&self) -> (String, usize) {
+    pub fn search_query_and_cursor(&self, max_len: usize) -> (String, usize) {
         let rev_right: String = self.search_query_right.chars().rev().collect();
-        (
-            self.search_query_left.clone() + &rev_right,
-            self.search_query_left.len(),
-        )
+        let text = self.search_query_left.clone() + &rev_right;
+        let cursor_pos = self.search_query_left.len();
+
+        if cursor_pos > max_len  {
+            return (last_chars(&text, max_len).into(), max_len);
+        } else {
+            return (first_chars(&text, max_len).into(), cursor_pos);
+        }
+
     }
 
     fn on_tab(&mut self) -> () {
@@ -351,7 +368,7 @@ impl App {
     }
 
     fn update_filtered_tree(&mut self) {
-        let query = &self.search_query_and_cursor().0;
+        let query = &self.search_query_and_cursor(usize::MAX).0;
         match &self.tree {
             Some(tree) => {
                 self.filtered_tree = tree.filter(query);
