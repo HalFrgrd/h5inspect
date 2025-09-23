@@ -132,12 +132,12 @@ fn render_object_info(frame: &mut Frame, app: &mut App, area: Rect) {
     }
 
     let num_lines_when_rendered: u16 = paragraph.line_count(area.width).try_into().unwrap();
-    let max_scroll_state = num_lines_when_rendered.saturating_sub(area.height) + 3;
+    let max_scroll_state = num_lines_when_rendered.saturating_sub(area.height - 2);
     app.object_info_scroll_state = app.object_info_scroll_state.clamp(0, max_scroll_state);
 
     let mut scrollbar_state = ScrollbarState::default()
         .content_length(max_scroll_state.into())
-        .viewport_content_length(area.height.into())
+        .viewport_content_length( (area.height).into())
         .position(app.object_info_scroll_state.into());
 
     frame.render_widget(
@@ -153,7 +153,7 @@ fn render_object_info(frame: &mut Frame, app: &mut App, area: Rect) {
             .begin_symbol(None)
             .track_symbol(None)
             .end_symbol(None),
-        area,
+        area.inner(Margin::new(0, 1)),
         &mut scrollbar_state,
     );
 }
