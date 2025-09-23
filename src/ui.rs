@@ -1,4 +1,4 @@
-use crate::app::{App, Mode};
+use crate::app::{App, SelectionMode};
 use crate::tree;
 use ratatui::layout::Margin;
 use ratatui::style::Modifier;
@@ -91,7 +91,7 @@ fn render_object_info(frame: &mut Frame, app: &mut App, area: Rect) {
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
         .border_style(
-            Style::default().fg(if let Mode::ObjectInfoInspecting = app.mode {
+            Style::default().fg(if let SelectionMode::ObjectInfoInspecting = app.mode {
                 COLOR_BORDER_HIGHLIGHT
             } else {
                 Color::White
@@ -164,7 +164,7 @@ fn render_search(frame: &mut Frame, app: &mut App, area: Rect) {
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
         .border_style(
-            Style::default().fg(if let Mode::SearchQueryEditing = app.mode {
+            Style::default().fg(if let SelectionMode::SearchQueryEditing = app.mode {
                 COLOR_BORDER_HIGHLIGHT
             } else {
                 Color::White
@@ -176,7 +176,7 @@ fn render_search(frame: &mut Frame, app: &mut App, area: Rect) {
     let search_query = Paragraph::new(search_query_text.as_str()).block(search_block);
     frame.render_widget(search_query, area);
     match app.mode {
-        Mode::SearchQueryEditing => {
+        SelectionMode::SearchQueryEditing => {
             frame.set_cursor_position(Position::new(
                 // Draw the cursor at the current position in the input field.
                 // This position is can be controlled via the left and right arrow key
@@ -199,7 +199,7 @@ fn render_tree(frame: &mut Frame, app: &mut App, area: Rect) {
         )
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
-        .border_style(Style::default().fg(if let Mode::Normal = app.mode {
+        .border_style(Style::default().fg(if let SelectionMode::TreeBrowsing = app.mode {
             COLOR_BORDER_HIGHLIGHT
         } else {
             Color::White

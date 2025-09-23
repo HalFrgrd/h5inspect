@@ -34,7 +34,7 @@ pub struct App {
     pub filtered_tree: Option<TreeNode<NodeIdT>>,
     pub search_query_left: String,
     pub search_query_right: String,
-    pub mode: Mode,
+    pub mode: SelectionMode,
     pub show_logs: bool,
     pub object_info_scroll_state: u16,
     pub last_object_info_area: Rect,
@@ -55,8 +55,8 @@ fn first_chars(s: &str, n: usize) -> &str {
     &s[..idx]
 }
 
-pub enum Mode {
-    Normal,
+pub enum SelectionMode {
+    TreeBrowsing,
     SearchQueryEditing,
     ObjectInfoInspecting,
 }
@@ -72,7 +72,7 @@ impl App {
             filtered_tree: None,
             search_query_left: String::new(),
             search_query_right: String::new(),
-            mode: Mode::Normal,
+            mode: SelectionMode::TreeBrowsing,
             show_logs: cfg!(debug_assertions),
             object_info_scroll_state: 0,
             last_object_info_area: Rect::new(0, 0, 0, 0),
@@ -149,11 +149,11 @@ impl App {
         log::debug!("clicked at {:?}", position);
 
         if self.last_tree_area.contains(position) {
-            self.mode = Mode::Normal;
+            self.mode = SelectionMode::TreeBrowsing;
         } else if self.last_object_info_area.contains(position) {
-            self.mode = Mode::ObjectInfoInspecting;
+            self.mode = SelectionMode::ObjectInfoInspecting;
         } else if self.last_search_query_area.contains(position) {
-            self.mode = Mode::SearchQueryEditing;
+            self.mode = SelectionMode::SearchQueryEditing;
         }
 
         if let Some(id) = self.tree_state.rendered_at(position) {
@@ -186,7 +186,7 @@ impl App {
                 }
             }
             KeyCode::Right | KeyCode::Char('l') => {
-                self.mode = Mode::ObjectInfoInspecting;
+                self.mode = SelectionMode::ObjectInfoInspecting;
             }
             KeyCode::Home => {
                 if self.filtered_tree.is_some() {
@@ -343,7 +343,7 @@ impl App {
                 self.object_info_scroll_state = self.object_info_scroll_state.saturating_add(1);
             }
             KeyCode::Left | KeyCode::Char('h') => {
-                self.mode = Mode::Normal;
+                self.mode = SelectionMode::TreeBrowsing;
             }
             KeyCode::PageDown => {
                 // This gets clamped when the ui figures out how many lines we have
@@ -480,31 +480,31 @@ impl App {
             }
 
             match self.mode {
-                Mode::Normal => match key.code {
+                SelectionMode::TreeBrowsing => match key.code {
                     KeyCode::Char('q') => {
                         self.running = false;
                     }
                     KeyCode::Char('/') => {
-                        self.mode = Mode::SearchQueryEditing;
+                        self.mode = SelectionMode::SearchQueryEditing;
                     }
                     other => {
                         self.on_keypress_normal_mode(other);
                     }
                 },
-                Mode::SearchQueryEditing => match key.code {
+                SelectionMode::SearchQueryEditing => match key.code {
                     KeyCode::Esc | KeyCode::Enter => {
-                        self.mode = Mode::Normal;
+                        self.mode = SelectionMode::TreeBrowsing;
                     }
                     _ => {
                         self.on_keypress_search_mode(key);
                     }
                 },
-                Mode::ObjectInfoInspecting => match key.code {
+                SelectionMode::ObjectInfoInspecting => match key.code {
                     KeyCode::Char('q') => {
                         self.running = false;
                     }
                     KeyCode::Char('/') => {
-                        self.mode = Mode::SearchQueryEditing;
+                        self.mode = SelectionMode::SearchQueryEditing;
                     }
                     other => {
                         self.on_keypress_object_info_mode(other);
@@ -524,7 +524,7 @@ impl App {
                     .contains(Position::new(mouse.column, mouse.row))
                 {
                     self.object_info_scroll_state = self.object_info_scroll_state.saturating_add(1);
-                    self.mode = Mode::ObjectInfoInspecting;
+                    self.mode = SelectionMode::ObjectInfoInspecting;
                 } else if self
                     .last_tree_area
                     .contains(Position::new(mouse.column, mouse.row))
@@ -538,7 +538,7 @@ impl App {
                     .contains(Position::new(mouse.column, mouse.row))
                 {
                     self.object_info_scroll_state = self.object_info_scroll_state.saturating_sub(1);
-                    self.mode = Mode::ObjectInfoInspecting;
+                    self.mode = SelectionMode::ObjectInfoInspecting;
                 } else if self
                     .last_tree_area
                     .contains(Position::new(mouse.column, mouse.row))
