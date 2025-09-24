@@ -33,59 +33,16 @@ impl fmt::Display for DataAnalysisError {
 }
 impl Error for DataAnalysisError {}
 
-// fn freedman_diaconis_bin_edges(data: &Array1<f64>) -> Edges<N64> {
-//     let n = data.len() as f64;
-
-//     // TODO: this needs mut?
-//     let q25 = data.clone().quantile_axis_skipnan_mut(ndarray::Axis(0), n64(0.25), &interpolate::Linear).unwrap().into_scalar();
-//     let q75 = data.clone().quantile_axis_skipnan_mut(ndarray::Axis(0), n64(0.75), &interpolate::Linear).unwrap().into_scalar();
-//     let iqr = q75 - q25;
-
-//     // Freedman-Diaconis bin width
-//     let bin_width = if iqr == 0.0 {1.0} else { 2.0 * iqr / (n  as f64).cbrt() }
-
-//     let min = data.min().unwrap().to_owned();
-//     let max = data.max().unwrap().to_owned();
-//     let num_bins = ((max - min) / bin_width).ceil() as usize;
-
-//     // Generate bin edges
-//     let edges = Array1::linspace(min, max, num_bins + 1);
-//     Edges::from(edges.mapv(|x| n64(x)))
-// }
-
 fn compute_histogram(d: &Array1<f64>) -> Result<HistogramData, Box<dyn Error>> {
     // Convert Array1<f64> to Array1<N64>
     let data: Array1<N64> = d.mapv(|x| n64(x));
     let observations: Array2<N64> = data.to_shape((data.len(), 1))?.to_owned();
 
-    // log::debug!("{}", asdf.to_string());
-    // // Build Freedman-Diaconis grid
-
-    // let observations = Array2::from_shape_vec(
-    //     (12, 1),
-    //     vec![1.0, 4., 5., 2., 100., 20., 50., 65., 27., 40., 45., 23.],
-    // ).unwrap();
-    // let observations = observations.mapv(|x| n64(x));
     let grid = GridBuilder::<FreedmanDiaconis<N64>>::from_array(&observations)?.build();
-    // log::debug!("{:?}", grid);
 
-    // // Create histogram
-    // let mut hist = Histogram::new(grid);
-    // log::debug!("{:?}", hist.ndim());
-
-    // // Add observations
-    // for x in observations {
-
-    //     hist.add_observation(x).unwrap();
-    // }
     let hist = observations.histogram(grid.clone());
 
-    // Get counts and bin edges
-    let counts = hist.counts(); // Array1<usize> if 1D
-                                // let edges = grid.();
-
-    // log::debug!("{:?}", hist.counts());
-    // log::debug!("{:?}", grid);
+    let counts = hist.counts();
 
     // Convert to Vec<(bin_center, count)> as f32
     let mut result = Vec::new();
@@ -96,8 +53,6 @@ fn compute_histogram(d: &Array1<f64>) -> Result<HistogramData, Box<dyn Error>> {
         let count = counts[i] as f32;
         result.push((bin.raw() as f32, count)); //todo
     }
-
-    // log::debug!("{:?}", result);
 
     Ok(result)
 }
@@ -133,8 +88,6 @@ where
     info.push(("std".to_owned(), arr_f64.std(1.).to_string()));
 
     let hist = compute_histogram(&arr_f64)?;
-
-    // info.push(("histogram".to_owned(), hist.to_string()));
 
     Ok(AnalysisResult::Stats(info, hist))
 }

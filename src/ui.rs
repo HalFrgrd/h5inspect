@@ -148,8 +148,7 @@ fn render_object_info(frame: &mut Frame, app: &mut App, area: Rect) {
 
                     let mut b =
                         textplots::Chart::new(width.into(), height.into(), min_bin, max_bin);
-                    // let a = textplots::Shape::Continuous(Box::new(|x| x.sin() / x));
-                    // let hist_data = vec![(0.,1.),(2.,1.0),(4.,4.),(5.,2.)];
+
                     let a = textplots::Shape::Bars(&hist_data);
                     let c = b.lineplot(&a);
                     c.borders();
@@ -167,10 +166,6 @@ fn render_object_info(frame: &mut Frame, app: &mut App, area: Rect) {
             paragraph = Paragraph::new(lines).wrap(Wrap { trim: false });
         }
     }
-
-    // let layout = Layout::vertical([Constraint::Percentage(50),Constraint::Percentage(50)]).split(area.inner(Margin::new(1, 1)));
-    // let area_stats = layout[0];
-    // let area_plot = layout[1];
 
     let num_lines_when_rendered: u16 = paragraph.line_count(area.width).try_into().unwrap();
     let max_scroll_state = num_lines_when_rendered.saturating_sub(area.height - 2);
