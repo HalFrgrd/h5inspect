@@ -514,6 +514,7 @@ dependencies = [
  "log",
  "ndarray",
  "num-format",
+ "num-traits",
  "ratatui",
  "regex",
  "tokio",

@@ -6,8 +6,7 @@ use crate::tree::TreeNode;
 use crate::ui::ui;
 use crossterm::event::{MouseButton, MouseEventKind};
 use hdf5_metno as hdf5;
-use hdf5_metno::datatype;
-use ndarray;
+
 use ratatui::crossterm::event::{KeyCode, KeyModifiers};
 use ratatui::layout::{Position, Rect};
 use std::collections::HashMap;
@@ -15,7 +14,6 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::vec;
 
-use futures::FutureExt;
 use tokio;
 
 #[allow(unused_imports)]
@@ -158,8 +156,8 @@ impl App {
                                 }
                                 AsyncDataAnalysis::Ready(val) => {
                                     match val {
-                                        analysis::AnalysisResult::Failed => {
-                                            stats_text = vec![("Stats".into(), "Failed!".into())];
+                                        analysis::AnalysisResult::Failed(s) => {
+                                            stats_text = vec![("Stats".into(), format!("Failed! ({})", s))];
                                         },
                                         analysis::AnalysisResult::NotAvailable => {
                                             stats_text = vec![("Stats".into(), "Not available".into())];
@@ -182,10 +180,10 @@ impl App {
                             let thread_dataset = dataset.clone();
                             tokio::task::spawn(async move {
                                 let analysis = analysis::hdf5_dataset_analysis(thread_dataset);
-                                let mut info_dict = thread_arc.lock().unwrap();
                                 
-                                let processed_analysis = analysis.unwrap_or(AnalysisResult::Failed);
-
+                                let processed_analysis = analysis.unwrap_or_else(|s| AnalysisResult::Failed(s.to_string()));
+                                
+                                let mut info_dict = thread_arc.lock().unwrap();
                                 info_dict.insert(k.clone(), AsyncDataAnalysis::Ready(processed_analysis));
                             });
                         };
@@ -528,7 +526,6 @@ impl App {
                 Some(event) = events.receiver.recv() => {
                     match event {
                         events::Event::AnimationTick => {
-                            log::debug!("Animation tick");
                             self.animation_state = self.animation_state.wrapping_add(1);
                         }
                         events::Event::Key(key) => self.handle_keypress(key),
