@@ -6,6 +6,7 @@ use std::error::Error;
 use ratatui;
 use tui_logger;
 
+mod analysis;
 mod app;
 mod events;
 mod h5_utils;

@@ -1,13 +1,17 @@
+use crate::analysis;
 use crate::events;
 use crate::h5_utils;
 use crate::tree::TreeNode;
 use crate::ui::ui;
 use crossterm::event::{MouseButton, MouseEventKind};
 use hdf5_metno as hdf5;
+use hdf5_metno::datatype;
+use ndarray;
 use ratatui::crossterm::event::{KeyCode, KeyModifiers};
 use ratatui::layout::{Position, Rect};
 use std::collections::HashMap;
 use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
 
 use futures::FutureExt;
 use tokio;
@@ -29,7 +33,7 @@ impl PartialEq for Hdf5Object {
 
 #[derive(Debug)]
 enum AsyncNodeInfo {
-    Pending(tokio::task::JoinHandle<String>),
+    Loading,
     Ready(String),
 }
 
@@ -51,7 +55,7 @@ pub struct App {
     pub last_tree_area: Rect,
     pub last_search_query_area: Rect,
     pub animation_state: u8,
-    node_id_to_info_task: HashMap<NodeIdT, AsyncNodeInfo>,
+    node_id_to_info_task: Arc<Mutex<HashMap<NodeIdT, AsyncNodeInfo>>>,
 }
 
 fn last_chars(s: &str, n: usize) -> &str {
@@ -91,7 +95,7 @@ impl App {
             last_tree_area: Rect::new(0, 0, 0, 0),
             last_search_query_area: Rect::new(0, 0, 0, 0),
             animation_state: 0,
-            node_id_to_info_task: HashMap::new(),
+            node_id_to_info_task: Arc::new(Mutex::new(HashMap::new())),
         }
     }
 
@@ -137,45 +141,46 @@ impl App {
                     Some(Hdf5Object::Dataset(dataset)) => {
                         let mut info = h5_utils::get_text_for_dataset(&dataset);
 
-                        let mut stats_text =
-                            "Loading".to_owned() + &".".repeat((self.animation_state % 4).into());
 
-                        let k = &tree_node.id();
 
-                        if let Some(mut node_info) = self.node_id_to_info_task.remove(k) {
+                        let k = tree_node.id().clone();
+
+                        let stats_text: String;
+                        
+
+                        let mut info_dict = self.node_id_to_info_task.lock().unwrap();
+
+                        if let Some(node_info) = info_dict.get(&k) {
                             match node_info {
-                                AsyncNodeInfo::Pending(ref mut task) => {
-                                    if let Some(info_result) = task.now_or_never() {
-                                        match info_result {
-                                            Ok(val) => {
-                                                log::debug!("success: {}", val);
-                                                self.node_id_to_info_task.insert(
-                                                    k.clone(),
-                                                    AsyncNodeInfo::Ready(val.clone()),
-                                                );
-                                                stats_text = val;
-                                            }
-                                            Err(e) => log::debug!("failed: {}", e),
-                                        }
-                                    } else {
-                                        self.node_id_to_info_task.insert(k.clone(), node_info);
-                                    }
+                                AsyncNodeInfo::Loading => {
+                                    stats_text = "Loading".to_owned() + &".".repeat((self.animation_state % 4).into());
                                 }
                                 AsyncNodeInfo::Ready(val) => {
-                                    self.node_id_to_info_task
-                                        .insert(k.clone(), AsyncNodeInfo::Ready(val.clone()));
                                     stats_text = val.to_owned();
                                 }
                             }
-                        } else {
-                            self.node_id_to_info_task.insert(
+                        } else { // we need to kick of the processing for this dataset
+                            stats_text = ("asdfasdf").to_string();
+                            info_dict.insert(
                                 k.clone(),
-                                AsyncNodeInfo::Pending(tokio::task::spawn(async {
-                                    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
-                                    "asdf".into()
-                                })),
+                                AsyncNodeInfo::Loading,
                             );
+                            
+                            if dataset.dtype().unwrap().is::<i32>() && dataset.ndim() == 1 {
+                                
+                                // TODO: move the reading into the thread
+                                let v: ndarray::Array1<i32> = dataset.read_1d().ok().unwrap();
+                                
+                                let thread_arc: Arc<Mutex<HashMap<NodeIdT, AsyncNodeInfo>>> = Arc::clone(&self.node_id_to_info_task);
+                                tokio::task::spawn(async move {
+                                    let asd = analysis::basic_int32(v);
+                                    let mut info_dict = thread_arc.lock().unwrap();
+                                    info_dict.insert(k.clone(), AsyncNodeInfo::Ready(asd));
+                                });
+                            }
                         };
+
+
 
                         info.push(("Stats".into(), stats_text));
 

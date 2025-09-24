@@ -3,6 +3,7 @@ use hdf5_metno as hdf5;
 use hdf5_metno::types::FixedUnicode;
 use humansize::{format_size, DECIMAL};
 use ndarray::arr2;
+use ndarray::Array1;
 use ndarray::Array2;
 use num_format::{Locale, ToFormattedString};
 use std::path::PathBuf;
@@ -371,12 +372,14 @@ pub fn generate_dummy_file() -> Result<()> {
         .create("qweqwe")?;
     group2_d1.write(&arr)?;
 
+    let arr = Array1::from_vec(vec![1, 2, 3]);
+
     // create a group with 1000 datasets
     let group3 = file.create_group("group3")?;
     for i in 0..2000 {
         let dataset = group3
             .new_dataset::<i32>()
-            .shape((ny, nx))
+            .shape(3)
             .create(format!("dataset_{}", i).as_str())?;
         dataset.write(&arr)?;
     }
