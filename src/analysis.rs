@@ -7,7 +7,7 @@ use std::error::Error;
 use std::fmt;
 use std::sync::Arc;
 
-use std::{thread, time};
+// use std::{thread, time};
 
 #[derive(Debug)]
 pub enum AnalysisResult {
@@ -61,7 +61,7 @@ pub fn hdf5_dataset_analysis(d: Arc<Dataset>) -> Result<AnalysisResult, Box<dyn 
         return Ok(AnalysisResult::NotAvailable);
     }
 
-    thread::sleep(time::Duration::from_secs(5));
+    // thread::sleep(time::Duration::from_secs(5));
 
     let dtype = d.dtype()?;
     if dtype.is::<f32>() {

@@ -7,6 +7,9 @@ use ndarray::Array1;
 use ndarray::Array2;
 use num_format::{Locale, ToFormattedString};
 use std::path::PathBuf;
+use rand::SeedableRng;
+use rand::rngs::StdRng;
+use rand_distr::{Normal, Distribution};
 
 // Calling group.name() or dataset.name() was very slow for some reason.
 // But group.member_names() was fast.
@@ -303,6 +306,23 @@ impl Pixel {
 #[allow(dead_code)]
 pub fn generate_dummy_file() -> Result<()> {
     let file = File::create("dummy.h5")?;
+
+    // Seeded RNG for reproducibility
+    let mut rng = StdRng::seed_from_u64(42);
+    // Normal distribution: mean=0, std=1
+    let normal = Normal::new(0.0, 1.0).unwrap();
+    // Create a group
+    // let normal_group = file.create_group("anormal")?;
+    // Generate 3 random normal numbers
+    let normal_arr: Array1<f32> = Array1::from_vec(
+        (0..1000).map(|_| normal.sample(&mut rng) as f32).collect()
+    );
+    let normal_ds = file
+        .new_dataset::<f32>()
+        .shape(1000)
+        .create("normal_distributed")?;
+    normal_ds.write(&normal_arr)?;
+    
 
     let (ny, nx) = (100, 100);
     let arr = Array2::from_shape_fn((ny, nx), |(j, i)| (1000 * j + i) as f32);
