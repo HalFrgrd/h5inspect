@@ -143,51 +143,51 @@ impl App {
 
                         let k = tree_node.id().clone();
 
-                        let stats_text: Vec<(String,String)>;
-                        let loading_text = vec![("Stats".into(), "Loading".to_owned() + &".".repeat((self.animation_state % 4).into()))];
-                        
+                        let stats_text: Vec<(String, String)>;
+                        let loading_text = vec![(
+                            "Stats".into(),
+                            "Loading".to_owned() + &".".repeat((self.animation_state % 4).into()),
+                        )];
 
                         let mut info_dict = self.node_id_to_analysis.lock().unwrap();
 
                         if let Some(node_info) = info_dict.get(&k) {
                             match node_info {
-                                AsyncDataAnalysis::Loading => {
-                                    stats_text = loading_text
-                                }
-                                AsyncDataAnalysis::Ready(val) => {
-                                    match val {
-                                        analysis::AnalysisResult::Failed(s) => {
-                                            stats_text = vec![("Stats".into(), format!("Failed! ({})", s))];
-                                        },
-                                        analysis::AnalysisResult::NotAvailable => {
-                                            stats_text = vec![("Stats".into(), "Not available".into())];
-                                        },
-                                        analysis::AnalysisResult::Stats(stats) => {
-                                            stats_text = stats.to_vec();
-                                        }
-                                    } 
-                                }
+                                AsyncDataAnalysis::Loading => stats_text = loading_text,
+                                AsyncDataAnalysis::Ready(val) => match val {
+                                    analysis::AnalysisResult::Failed(s) => {
+                                        stats_text =
+                                            vec![("Stats".into(), format!("Failed! ({})", s))];
+                                    }
+                                    analysis::AnalysisResult::NotAvailable => {
+                                        stats_text = vec![("Stats".into(), "Not available".into())];
+                                    }
+                                    analysis::AnalysisResult::Stats(stats) => {
+                                        stats_text = stats.to_vec();
+                                    }
+                                },
                             }
-                        } else { // we need to kick of the processing for this dataset
+                        } else {
+                            // we need to kick of the processing for this dataset
                             stats_text = loading_text;
-                            info_dict.insert(
-                                k.clone(),
-                                AsyncDataAnalysis::Loading,
-                            );
-                            
-                            
-                            let thread_arc: Arc<Mutex<HashMap<NodeIdT, AsyncDataAnalysis>>> = Arc::clone(&self.node_id_to_analysis);
+                            info_dict.insert(k.clone(), AsyncDataAnalysis::Loading);
+
+                            let thread_arc: Arc<Mutex<HashMap<NodeIdT, AsyncDataAnalysis>>> =
+                                Arc::clone(&self.node_id_to_analysis);
                             let thread_dataset = dataset.clone();
                             tokio::task::spawn(async move {
                                 let analysis = analysis::hdf5_dataset_analysis(thread_dataset);
-                                
-                                let processed_analysis = analysis.unwrap_or_else(|s| AnalysisResult::Failed(s.to_string()));
-                                
+
+                                let processed_analysis = analysis
+                                    .unwrap_or_else(|s| AnalysisResult::Failed(s.to_string()));
+
                                 let mut info_dict = thread_arc.lock().unwrap();
-                                info_dict.insert(k.clone(), AsyncDataAnalysis::Ready(processed_analysis));
+                                info_dict.insert(
+                                    k.clone(),
+                                    AsyncDataAnalysis::Ready(processed_analysis),
+                                );
                             });
                         };
-
 
                         info.extend(stats_text);
 
