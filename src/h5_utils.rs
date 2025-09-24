@@ -6,10 +6,10 @@ use ndarray::arr2;
 use ndarray::Array1;
 use ndarray::Array2;
 use num_format::{Locale, ToFormattedString};
-use std::path::PathBuf;
-use rand::SeedableRng;
 use rand::rngs::StdRng;
-use rand_distr::{Normal, Distribution};
+use rand::SeedableRng;
+use rand_distr::{Distribution, Normal};
+use std::path::PathBuf;
 
 // Calling group.name() or dataset.name() was very slow for some reason.
 // But group.member_names() was fast.
@@ -314,15 +314,13 @@ pub fn generate_dummy_file() -> Result<()> {
     // Create a group
     // let normal_group = file.create_group("anormal")?;
     // Generate 3 random normal numbers
-    let normal_arr: Array1<f32> = Array1::from_vec(
-        (0..1000).map(|_| normal.sample(&mut rng) as f32).collect()
-    );
+    let normal_arr: Array1<f32> =
+        Array1::from_vec((0..1000).map(|_| normal.sample(&mut rng) as f32).collect());
     let normal_ds = file
         .new_dataset::<f32>()
         .shape(1000)
         .create("normal_distributed")?;
     normal_ds.write(&normal_arr)?;
-    
 
     let (ny, nx) = (100, 100);
     let arr = Array2::from_shape_fn((ny, nx), |(j, i)| (1000 * j + i) as f32);
