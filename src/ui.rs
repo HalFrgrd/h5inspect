@@ -1,3 +1,4 @@
+use crate::analysis::AnalysisResult;
 use crate::app::{App, SelectionMode};
 use crate::tree;
 use ratatui::layout::Margin;
@@ -11,6 +12,8 @@ use ratatui::{
     widgets::{Block, BorderType, Borders, Paragraph, Scrollbar, ScrollbarOrientation, Wrap},
     Frame,
 };
+use textplots;
+use textplots::Plot;
 use tui_logger;
 use tui_tree_widget::Tree as WidgetTreeRoot;
 use tui_tree_widget::TreeItem as WidgetTreeItem;
@@ -103,6 +106,8 @@ fn render_object_info(frame: &mut Frame, app: &mut App, area: Rect) {
             }),
         );
 
+    // frame.render_widget(object_info, area);
+
     let selected = app.tree_state.selected().to_vec();
     let mut paragraph = Paragraph::new("Select on the left".to_string());
     if !selected.is_empty() {
@@ -132,9 +137,32 @@ fn render_object_info(frame: &mut Frame, app: &mut App, area: Rect) {
                 }
             }
 
+            log::debug!("{}", area.width);
+
+            let width = area.width - 2;
+            let height = area.height - 2;
+            if width > 32 && height > 10 {
+                let mut b = textplots::Chart::new(width.into(), height.into(), -30., 30.);
+                let a = textplots::Shape::Continuous(Box::new(|x| x.sin() / x));
+                let c = b.lineplot(&a);
+                c.borders();
+                c.axis();
+                c.figures();
+
+                let plot = c.to_string();
+
+                for x in plot.split_terminator('\n') {
+                    lines.push(Line::from(x.to_owned()));
+                }
+            }
+
             paragraph = Paragraph::new(lines).wrap(Wrap { trim: false });
         }
     }
+
+    // let layout = Layout::vertical([Constraint::Percentage(50),Constraint::Percentage(50)]).split(area.inner(Margin::new(1, 1)));
+    // let area_stats = layout[0];
+    // let area_plot = layout[1];
 
     let num_lines_when_rendered: u16 = paragraph.line_count(area.width).try_into().unwrap();
     let max_scroll_state = num_lines_when_rendered.saturating_sub(area.height - 2);
