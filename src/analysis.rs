@@ -1,9 +1,9 @@
 #[allow(unused_imports)]
 use hdf5::{File, H5Type};
 use hdf5_metno::{self as hdf5, Dataset};
-use ndarray::{self, Array1, Array2, ArrayD, ArrayView1};
-use ndarray_stats::histogram::{strategies::FreedmanDiaconis, Edges, GridBuilder, Histogram};
-use ndarray_stats::{histogram, interpolate, HistogramExt, QuantileExt};
+use ndarray::{self, Array1, Array2};
+use ndarray_stats::histogram::{strategies::FreedmanDiaconis, GridBuilder};
+use ndarray_stats::HistogramExt;
 use noisy_float::prelude::*;
 use num_traits::{self, ToPrimitive};
 use std::error::Error;

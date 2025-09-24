@@ -1,4 +1,3 @@
-use crate::analysis::AnalysisResult;
 use crate::app::{App, SelectionMode};
 use crate::tree;
 use ratatui::layout::Margin;
@@ -146,8 +145,12 @@ fn render_object_info(frame: &mut Frame, app: &mut App, area: Rect) {
                     let min_bin = hist_data.iter().fold(f32::INFINITY, |a, &b| a.min(b.0));
                     let max_bin = hist_data.iter().fold(f32::NEG_INFINITY, |a, &b| a.max(b.0));
 
-                    let mut b =
-                        textplots::Chart::new(width.into(), height.into(), min_bin, max_bin);
+                    let mut b = textplots::Chart::new(
+                        ((width as f32) * 1.9) as u32,
+                        ((height as f32) * 1.9) as u32,
+                        min_bin,
+                        max_bin,
+                    );
 
                     let a = textplots::Shape::Bars(&hist_data);
                     let c = b.lineplot(&a);
