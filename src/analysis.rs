@@ -7,6 +7,8 @@ use std::error::Error;
 use std::fmt;
 use std::sync::Arc;
 
+use std::{thread, time};
+
 #[derive(Debug)]
 pub enum AnalysisResult {
     Stats(Vec<(String, String)>),
@@ -55,16 +57,17 @@ where
 }
 
 pub fn hdf5_dataset_analysis(d: Arc<Dataset>) -> Result<AnalysisResult, Box<dyn Error>> {
-    if d.ndim() == 1 {
-        if d.size() == 0 {
-            Ok(AnalysisResult::NotAvailable)
-        } else if d.dtype()?.is::<f32>() {
-            analysis_1d::<f32>(d)
-        } else if d.dtype()?.is::<i32>() {
-            analysis_1d::<i32>(d)
-        } else {
-            Ok(AnalysisResult::NotAvailable)
-        }
+    if d.ndim() != 1 || d.size() == 0 {
+        return Ok(AnalysisResult::NotAvailable);
+    }
+
+    thread::sleep(time::Duration::from_secs(5));
+
+    let dtype = d.dtype()?;
+    if dtype.is::<f32>() {
+        analysis_1d::<f32>(d)
+    } else if dtype.is::<i32>() {
+        analysis_1d::<i32>(d)
     } else {
         Ok(AnalysisResult::NotAvailable)
     }

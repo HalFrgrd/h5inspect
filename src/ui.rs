@@ -86,8 +86,13 @@ where
 }
 
 fn render_object_info(frame: &mut Frame, app: &mut App, area: Rect) {
+    let num_active_tasks = app.get_num_active_data_analysis_tasks();
+
     let object_info = Block::new()
         .title("Object info")
+        .title_bottom(
+            Line::from(format!("num analysis tasks: {}", num_active_tasks)).left_aligned(),
+        )
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
         .border_style(

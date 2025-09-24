@@ -134,6 +134,14 @@ impl App {
         Ok(tree_from_group(root_name, root_group))
     }
 
+    pub fn get_num_active_data_analysis_tasks(&self) -> usize {
+        let info_dict = self.node_id_to_analysis.lock().unwrap();
+        info_dict
+            .values()
+            .filter(|&v| matches!(v, AsyncDataAnalysis::Loading))
+            .count()
+    }
+
     pub fn get_text_for(&mut self, path: &[NodeIdT]) -> Option<Vec<(String, String)>> {
         if let Some(tree) = &self.tree {
             match tree.get_selected_node(path) {
@@ -175,7 +183,7 @@ impl App {
                             let thread_arc: Arc<Mutex<HashMap<NodeIdT, AsyncDataAnalysis>>> =
                                 Arc::clone(&self.node_id_to_analysis);
                             let thread_dataset = dataset.clone();
-                            tokio::task::spawn(async move {
+                            tokio::task::spawn_blocking(move || {
                                 let analysis = analysis::hdf5_dataset_analysis(thread_dataset);
 
                                 let processed_analysis = analysis
