@@ -56,7 +56,7 @@ impl<IdT> tree::TreeNode<IdT>
 where
     IdT: Eq + Hash + Clone + std::fmt::Debug,
 {
-    pub fn into_tree_item(&self) -> WidgetTreeItem<IdT> {
+    pub fn into_tree_item(&self) -> WidgetTreeItem<'_, IdT> {
         let children: Vec<_> = self
             .children()
             .iter()
