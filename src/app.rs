@@ -1,4 +1,5 @@
 use crate::analysis;
+use crate::analysis::AnalysisResult;
 use crate::events;
 use crate::h5_utils;
 use crate::tree::TreeNode;
@@ -12,6 +13,7 @@ use ratatui::layout::{Position, Rect};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
+use std::vec;
 
 use futures::FutureExt;
 use tokio;
@@ -22,7 +24,7 @@ use log::*;
 #[derive(Debug, Clone)]
 pub enum Hdf5Object {
     Group(hdf5::Group),
-    Dataset(hdf5::Dataset),
+    Dataset(Arc<hdf5::Dataset>),
 }
 
 impl PartialEq for Hdf5Object {
@@ -32,9 +34,9 @@ impl PartialEq for Hdf5Object {
 }
 
 #[derive(Debug)]
-enum AsyncNodeInfo {
+enum AsyncDataAnalysis {
     Loading,
-    Ready(String),
+    Ready(analysis::AnalysisResult),
 }
 
 pub type NodeIdT = hdf5_metno_sys::h5i::hid_t;
@@ -55,7 +57,7 @@ pub struct App {
     pub last_tree_area: Rect,
     pub last_search_query_area: Rect,
     pub animation_state: u8,
-    node_id_to_info_task: Arc<Mutex<HashMap<NodeIdT, AsyncNodeInfo>>>,
+    node_id_to_analysis: Arc<Mutex<HashMap<NodeIdT, AsyncDataAnalysis>>>,
 }
 
 fn last_chars(s: &str, n: usize) -> &str {
@@ -95,7 +97,7 @@ impl App {
             last_tree_area: Rect::new(0, 0, 0, 0),
             last_search_query_area: Rect::new(0, 0, 0, 0),
             animation_state: 0,
-            node_id_to_info_task: Arc::new(Mutex::new(HashMap::new())),
+            node_id_to_analysis: Arc::new(Mutex::new(HashMap::new())),
         }
     }
 
@@ -120,7 +122,7 @@ impl App {
                 children.push(
                     TreeNode::new(node_id, text, vec![])
                         .set_storage_dataset_size(dataset.storage_size())
-                        .set_hdf5_object(Hdf5Object::Dataset(dataset)),
+                        .set_hdf5_object(Hdf5Object::Dataset(Arc::new(dataset))),
                 );
             }
 
@@ -141,48 +143,55 @@ impl App {
                     Some(Hdf5Object::Dataset(dataset)) => {
                         let mut info = h5_utils::get_text_for_dataset(&dataset);
 
-
-
                         let k = tree_node.id().clone();
 
-                        let stats_text: String;
+                        let stats_text: Vec<(String,String)>;
+                        let loading_text = vec![("Stats".into(), "Loading".to_owned() + &".".repeat((self.animation_state % 4).into()))];
                         
 
-                        let mut info_dict = self.node_id_to_info_task.lock().unwrap();
+                        let mut info_dict = self.node_id_to_analysis.lock().unwrap();
 
                         if let Some(node_info) = info_dict.get(&k) {
                             match node_info {
-                                AsyncNodeInfo::Loading => {
-                                    stats_text = "Loading".to_owned() + &".".repeat((self.animation_state % 4).into());
+                                AsyncDataAnalysis::Loading => {
+                                    stats_text = loading_text
                                 }
-                                AsyncNodeInfo::Ready(val) => {
-                                    stats_text = val.to_owned();
+                                AsyncDataAnalysis::Ready(val) => {
+                                    match val {
+                                        analysis::AnalysisResult::Failed => {
+                                            stats_text = vec![("Stats".into(), "Failed!".into())];
+                                        },
+                                        analysis::AnalysisResult::NotAvailable => {
+                                            stats_text = vec![("Stats".into(), "Not available".into())];
+                                        },
+                                        analysis::AnalysisResult::Stats(stats) => {
+                                            stats_text = stats.to_vec();
+                                        }
+                                    } 
                                 }
                             }
                         } else { // we need to kick of the processing for this dataset
-                            stats_text = ("asdfasdf").to_string();
+                            stats_text = loading_text;
                             info_dict.insert(
                                 k.clone(),
-                                AsyncNodeInfo::Loading,
+                                AsyncDataAnalysis::Loading,
                             );
                             
-                            if dataset.dtype().unwrap().is::<i32>() && dataset.ndim() == 1 {
+                            
+                            let thread_arc: Arc<Mutex<HashMap<NodeIdT, AsyncDataAnalysis>>> = Arc::clone(&self.node_id_to_analysis);
+                            let thread_dataset = dataset.clone();
+                            tokio::task::spawn(async move {
+                                let analysis = analysis::hdf5_dataset_analysis(thread_dataset);
+                                let mut info_dict = thread_arc.lock().unwrap();
                                 
-                                // TODO: move the reading into the thread
-                                let v: ndarray::Array1<i32> = dataset.read_1d().ok().unwrap();
-                                
-                                let thread_arc: Arc<Mutex<HashMap<NodeIdT, AsyncNodeInfo>>> = Arc::clone(&self.node_id_to_info_task);
-                                tokio::task::spawn(async move {
-                                    let asd = analysis::basic_int32(v);
-                                    let mut info_dict = thread_arc.lock().unwrap();
-                                    info_dict.insert(k.clone(), AsyncNodeInfo::Ready(asd));
-                                });
-                            }
+                                let processed_analysis = analysis.unwrap_or(AnalysisResult::Failed);
+
+                                info_dict.insert(k.clone(), AsyncDataAnalysis::Ready(processed_analysis));
+                            });
                         };
 
 
-
-                        info.push(("Stats".into(), stats_text));
+                        info.extend(stats_text);
 
                         Some(info)
                     }
