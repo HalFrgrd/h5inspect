@@ -1,8 +1,9 @@
 #[allow(unused_imports)]
 use hdf5::{File, H5Type};
 use hdf5_metno::{self as hdf5, Dataset};
-use ndarray::{self, Array1, Array2};
-use ndarray_stats::histogram::{strategies::FreedmanDiaconis, GridBuilder};
+use ndarray::{self, Array1};
+use ndarray_stats::histogram::strategies::{BinsBuildingStrategy, FreedmanDiaconis};
+use ndarray_stats::histogram::{Grid, GridBuilder, Histogram};
 use ndarray_stats::HistogramExt;
 use noisy_float::prelude::*;
 use num_traits::{self, ToPrimitive};
@@ -36,11 +37,16 @@ impl Error for DataAnalysisError {}
 fn compute_histogram(d: &Array1<f64>) -> Result<HistogramData, Box<dyn Error>> {
     // Convert Array1<f64> to Array1<N64>
     let data: Array1<N64> = d.mapv(|x| n64(x));
-    let observations: Array2<N64> = data.to_shape((data.len(), 1))?.to_owned();
+    // let observations: Array2<N64> = data.to_shape((data.len(), 1))?.to_owned();
 
-    let grid = GridBuilder::<FreedmanDiaconis<N64>>::from_array(&observations)?.build();
+    let bins = FreedmanDiaconis::<N64>::from_array(&data)?.build();
+    let grid = Grid::from(vec![bins.clone()]);
 
-    let hist = observations.histogram(grid.clone());
+    // let hist = data.histogram(grid);
+    let mut hist = Histogram::new(grid);
+    for x in data {
+        hist.add_observation(&Array1::from_vec(vec![x]))?;
+    }
 
     let counts = hist.counts();
 
@@ -49,7 +55,7 @@ fn compute_histogram(d: &Array1<f64>) -> Result<HistogramData, Box<dyn Error>> {
     for i in 0..counts.len() {
         // log::debug!("{:?}", grid.index(&[i]).get(0));
 
-        let bin = grid.index(&[i]).get(0).unwrap().start.clone();
+        let bin = bins.index(i).start;
         let count = counts[i] as f32;
         result.push((bin.raw() as f32, count)); //todo
     }
