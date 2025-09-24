@@ -142,7 +142,10 @@ impl App {
             .count()
     }
 
-    pub fn get_text_for(&mut self, path: &[NodeIdT]) -> Option<Vec<(String, String)>> {
+    pub fn get_text_for(
+        &mut self,
+        path: &[NodeIdT],
+    ) -> Option<(Vec<(String, String)>, Option<analysis::HistogramData>)> {
         if let Some(tree) = &self.tree {
             match tree.get_selected_node(path) {
                 Some(ref tree_node) => match &tree_node.hdf5_object {
@@ -156,6 +159,7 @@ impl App {
                             "Stats".into(),
                             "Loading".to_owned() + &".".repeat((self.animation_state % 4).into()),
                         )];
+                        let mut hist_data: Option<analysis::HistogramData> = None;
 
                         let mut info_dict = self.node_id_to_analysis.lock().unwrap();
 
@@ -170,8 +174,9 @@ impl App {
                                     analysis::AnalysisResult::NotAvailable => {
                                         stats_text = vec![("Stats".into(), "Not available".into())];
                                     }
-                                    analysis::AnalysisResult::Stats(stats) => {
+                                    analysis::AnalysisResult::Stats(stats, h) => {
                                         stats_text = stats.to_vec();
+                                        hist_data = Some(h.to_owned());
                                     }
                                 },
                             }
@@ -199,11 +204,11 @@ impl App {
 
                         info.extend(stats_text);
 
-                        Some(info)
+                        Some((info, hist_data))
                     }
                     Some(Hdf5Object::Group(group)) => {
                         let size = tree_node.recursive_storage_data_size;
-                        Some(h5_utils::get_text_for_group(&group, size))
+                        Some((h5_utils::get_text_for_group(&group, size), None))
                     }
                     None => {
                         debug!("No hdf5 object found at path {:?}", path);

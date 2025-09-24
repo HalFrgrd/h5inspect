@@ -18,6 +18,7 @@ use tui_logger;
 use tui_tree_widget::Tree as WidgetTreeRoot;
 use tui_tree_widget::TreeItem as WidgetTreeItem;
 
+use core::f32;
 use std::hash::Hash;
 const STYLE_HIGHLIGHT: Style = Style::new().bg(Color::DarkGray);
 const STYLE_DEFAULT_TEXT: Style = Style::new().fg(Color::White);
@@ -113,7 +114,7 @@ fn render_object_info(frame: &mut Frame, app: &mut App, area: Rect) {
     if !selected.is_empty() {
         // selected is of form: ["/group1", "/group1/dataset1"]
         let info = app.get_text_for(&selected);
-        if let Some(info) = info {
+        if let Some((info, hist_data_opt)) = info {
             let mut lines = vec![];
 
             for (key, value) in info {
@@ -137,22 +138,29 @@ fn render_object_info(frame: &mut Frame, app: &mut App, area: Rect) {
                 }
             }
 
-            log::debug!("{}", area.width);
-
             let width = area.width - 2;
             let height = area.height - 2;
             if width > 32 && height > 10 {
-                let mut b = textplots::Chart::new(width.into(), height.into(), -30., 30.);
-                let a = textplots::Shape::Continuous(Box::new(|x| x.sin() / x));
-                let c = b.lineplot(&a);
-                c.borders();
-                c.axis();
-                c.figures();
+                if let Some(hist_data) = hist_data_opt {
+                    // Get min of first elements, default to -10.0
+                    let min_bin = hist_data.iter().fold(f32::INFINITY, |a, &b| a.min(b.0));
+                    let max_bin = hist_data.iter().fold(f32::NEG_INFINITY, |a, &b| a.max(b.0));
 
-                let plot = c.to_string();
+                    let mut b =
+                        textplots::Chart::new(width.into(), height.into(), min_bin, max_bin);
+                    // let a = textplots::Shape::Continuous(Box::new(|x| x.sin() / x));
+                    // let hist_data = vec![(0.,1.),(2.,1.0),(4.,4.),(5.,2.)];
+                    let a = textplots::Shape::Bars(&hist_data);
+                    let c = b.lineplot(&a);
+                    c.borders();
+                    c.axis();
+                    c.figures();
 
-                for x in plot.split_terminator('\n') {
-                    lines.push(Line::from(x.to_owned()));
+                    let plot = c.to_string();
+
+                    for x in plot.split_terminator('\n') {
+                        lines.push(Line::from(x.to_owned()));
+                    }
                 }
             }
 

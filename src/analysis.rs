@@ -12,9 +12,11 @@ use std::sync::Arc;
 
 // use std::{thread, time};
 
+pub type HistogramData = Vec<(f32, f32)>;
+
 #[derive(Debug)]
 pub enum AnalysisResult {
-    Stats(Vec<(String, String)>),
+    Stats(Vec<(String, String)>, HistogramData),
     NotAvailable,
     Failed(String),
 }
@@ -51,7 +53,7 @@ impl Error for DataAnalysisError {}
 //     Edges::from(edges.mapv(|x| n64(x)))
 // }
 
-fn compute_histogram(d: &Array1<f64>) -> Result<Array1<usize>, Box<dyn Error>> {
+fn compute_histogram(d: &Array1<f64>) -> Result<HistogramData, Box<dyn Error>> {
     // Convert Array1<f64> to Array1<N64>
     let data: Array1<N64> = d.mapv(|x| n64(x));
     let observations: Array2<N64> = data.to_shape((data.len(), 1))?.to_owned();
@@ -65,7 +67,7 @@ fn compute_histogram(d: &Array1<f64>) -> Result<Array1<usize>, Box<dyn Error>> {
     // ).unwrap();
     // let observations = observations.mapv(|x| n64(x));
     let grid = GridBuilder::<FreedmanDiaconis<N64>>::from_array(&observations)?.build();
-    log::debug!("{:?}", grid);
+    // log::debug!("{:?}", grid);
 
     // // Create histogram
     // let mut hist = Histogram::new(grid);
@@ -76,15 +78,28 @@ fn compute_histogram(d: &Array1<f64>) -> Result<Array1<usize>, Box<dyn Error>> {
 
     //     hist.add_observation(x).unwrap();
     // }
-    let hist = observations.histogram(grid);
+    let hist = observations.histogram(grid.clone());
 
-    let counts = hist.counts().to_owned();
-    Ok(counts.to_shape((counts.len(),))?.to_owned())
+    // Get counts and bin edges
+    let counts = hist.counts(); // Array1<usize> if 1D
+                                // let edges = grid.();
 
     // log::debug!("{:?}", hist.counts());
+    // log::debug!("{:?}", grid);
 
-    // // hist.counts().to_owned();
-    // Ok(())
+    // Convert to Vec<(bin_center, count)> as f32
+    let mut result = Vec::new();
+    for i in 0..counts.len() {
+        // log::debug!("{:?}", grid.index(&[i]).get(0));
+
+        let bin = grid.index(&[i]).get(0).unwrap().start.clone();
+        let count = counts[i] as f32;
+        result.push((bin.raw() as f32, count)); //todo
+    }
+
+    // log::debug!("{:?}", result);
+
+    Ok(result)
 }
 
 fn analysis_1d<T>(d: Arc<Dataset>) -> Result<AnalysisResult, Box<dyn Error>>
@@ -119,9 +134,9 @@ where
 
     let hist = compute_histogram(&arr_f64)?;
 
-    info.push(("histogram".to_owned(), hist.to_string()));
+    // info.push(("histogram".to_owned(), hist.to_string()));
 
-    Ok(AnalysisResult::Stats(info))
+    Ok(AnalysisResult::Stats(info, hist))
 }
 
 pub fn hdf5_dataset_analysis(d: Arc<Dataset>) -> Result<AnalysisResult, Box<dyn Error>> {
