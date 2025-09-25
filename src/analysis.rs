@@ -5,12 +5,11 @@ use ndarray::{self, Array1};
 // use ndarray_stats::histogram::strategies::{BinsBuildingStrategy, FreedmanDiaconis};
 // use ndarray_stats::histogram::{Grid, Histogram};
 use noisy_float::prelude::*;
-use num_traits::{self, ToPrimitive};
+use num_traits::{self, ToPrimitive, Zero};
 use std::error::Error;
-use std::fmt;
 use std::sync::Arc;
+use crate::num_utils::Summable;
 
-// use std::{thread, time};
 
 pub type HistogramData = Vec<(f32, f32)>;
 
@@ -21,17 +20,7 @@ pub enum AnalysisResult {
     Failed(String),
 }
 
-#[derive(Debug)]
-struct DataAnalysisError {
-    pub msg: String,
-}
 
-impl fmt::Display for DataAnalysisError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "DataAnalysisError: {}", self.msg)
-    }
-}
-impl Error for DataAnalysisError {}
 
 fn compute_histogram(d: &Array1<f64>) -> Result<HistogramData, Box<dyn Error>> {
     let data: Array1<N64> = d.mapv(|x| n64(x));
@@ -63,6 +52,7 @@ fn compute_histogram(d: &Array1<f64>) -> Result<HistogramData, Box<dyn Error>> {
 fn analysis_1d<T>(d: Arc<Dataset>) -> Result<AnalysisResult, Box<dyn Error>>
 where
     T: H5Type
+        + Summable
         + num_traits::FromPrimitive
         + num_traits::Zero
         + Clone
@@ -70,7 +60,7 @@ where
         + ToString
         + std::fmt::Debug
         + std::fmt::Display
-        + ToPrimitive,
+        + ToPrimitive
 {
     let mut info: Vec<(String, String)> = Vec::new();
 
@@ -78,13 +68,14 @@ where
 
     info.push(("Data".to_owned(), format!("{}", v)));
 
+    
+    let sum: T::AccumulatorType = v.iter().fold(T::AccumulatorType::zero(), |acc,x| acc + x.to_owned().into() );
+
     info.push((
         "mean".to_owned(),
         format!(
             "{:.5}",
-            v.mean().ok_or(DataAnalysisError {
-                msg: "problem with mean".into(),
-            })?
+            (sum.to_f64().unwrap_or(f64::NAN) ) / (v.len() as f64)
         ),
     ));
 
@@ -100,8 +91,6 @@ pub fn hdf5_dataset_analysis(d: Arc<Dataset>) -> Result<AnalysisResult, Box<dyn 
     if d.ndim() != 1 || d.size() == 0 {
         return Ok(AnalysisResult::NotAvailable);
     }
-
-    // thread::sleep(time::Duration::from_secs(5));
 
     let dtype = d.dtype()?;
     if dtype.is::<f32>() {

@@ -12,6 +12,8 @@ mod events;
 mod h5_utils;
 mod tree;
 mod ui;
+mod num_utils;
+
 
 fn main() -> Result<(), Box<dyn Error>> {
     // crate::h5_utils::generate_dummy_file()?;
