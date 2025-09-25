@@ -59,19 +59,6 @@ pub struct App {
     node_id_to_analysis: Arc<Mutex<HashMap<NodeIdT, AsyncDataAnalysis>>>,
 }
 
-fn last_chars(s: &str, n: usize) -> &str {
-    let len = s.chars().count();
-    let start = len.saturating_sub(n);
-    let idx = s.char_indices().nth(start).map(|(i, _)| i).unwrap_or(0);
-    &s[idx..]
-}
-
-fn first_chars(s: &str, n: usize) -> &str {
-    let mut char_indices = s.char_indices();
-    let idx = char_indices.nth(n).map(|(i, _)| i).unwrap_or(s.len());
-    &s[..idx]
-}
-
 pub enum SelectionMode {
     TreeBrowsing,
     SearchQueryEditing,
@@ -557,6 +544,7 @@ impl App {
 
     fn handle_keypress(&mut self, key: crossterm::event::KeyEvent) {
         if key.kind == crossterm::event::KeyEventKind::Press {
+            // log::debug!("{:?}",  key);
             // if Ctrl+c is pressed, exit
             if key.code == KeyCode::Char('c') && key.modifiers == KeyModifiers::CONTROL {
                 self.running = false;
