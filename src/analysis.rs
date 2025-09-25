@@ -2,8 +2,8 @@
 use hdf5::{File, H5Type};
 use hdf5_metno::{self as hdf5, Dataset};
 use ndarray::{self, Array1};
-use ndarray_stats::histogram::strategies::{BinsBuildingStrategy, FreedmanDiaconis};
-use ndarray_stats::histogram::{Grid, Histogram};
+// use ndarray_stats::histogram::strategies::{BinsBuildingStrategy, FreedmanDiaconis};
+// use ndarray_stats::histogram::{Grid, Histogram};
 use noisy_float::prelude::*;
 use num_traits::{self, ToPrimitive};
 use std::error::Error;
@@ -34,29 +34,27 @@ impl fmt::Display for DataAnalysisError {
 impl Error for DataAnalysisError {}
 
 fn compute_histogram(d: &Array1<f64>) -> Result<HistogramData, Box<dyn Error>> {
-    // Convert Array1<f64> to Array1<N64>
     let data: Array1<N64> = d.mapv(|x| n64(x));
-    // let observations: Array2<N64> = data.to_shape((data.len(), 1))?.to_owned();
 
-    let bins = FreedmanDiaconis::<N64>::from_array(&data)?.build();
-    let grid = Grid::from(vec![bins.clone()]);
+    let n_bins = 30; // Number of bins
+    let min = data.iter().min().unwrap().clone();
+    let max = data.iter().max().unwrap().clone();
+    let bin_width = (max - min) / n64(n_bins as f64);
 
-    // let hist = data.histogram(grid);
-    let mut hist = Histogram::new(grid);
-    for x in data {
-        hist.add_observation(&Array1::from_vec(vec![x]))?;
+    let mut counts = vec![0; n_bins];
+    for &value in data.iter() {
+        let bin_index = ((value - min) / bin_width).floor().to_usize().unwrap();
+        if bin_index < n_bins {
+            counts[bin_index] += 1;
+        }
     }
-
-    let counts = hist.counts();
 
     // Convert to Vec<(bin_center, count)> as f32
     let mut result = Vec::new();
-    for i in 0..counts.len() {
-        // log::debug!("{:?}", grid.index(&[i]).get(0));
-
-        let bin = bins.index(i).start;
+    for i in 0..n_bins {
+        let bin_center = min + (bin_width * n64(i as f64)) + (bin_width / n64(2.0));
         let count = counts[i] as f32;
-        result.push((bin.raw() as f32, count)); //todo
+        result.push((bin_center.raw() as f32, count));
     }
 
     Ok(result)
@@ -82,15 +80,16 @@ where
 
     info.push((
         "mean".to_owned(),
-        v.mean()
-            .ok_or(DataAnalysisError {
+        format!(
+            "{:.5}",
+            v.mean().ok_or(DataAnalysisError {
                 msg: "problem with mean".into(),
             })?
-            .to_string(),
+        ),
     ));
 
     let arr_f64: Array1<f64> = v.mapv(|x| x.to_f64().unwrap_or(0.0));
-    info.push(("std".to_owned(), arr_f64.std(1.).to_string()));
+    info.push(("std".to_owned(), format!("{:.5}", arr_f64.std(1.))));
 
     let hist = compute_histogram(&arr_f64)?;
 

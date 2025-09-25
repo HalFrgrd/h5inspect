@@ -1,6 +1,6 @@
 use crate::app::{App, SelectionMode};
 use crate::tree;
-use num_traits::{clamp, SaturatingSub};
+use num_traits::clamp;
 use ratatui::layout::Margin;
 use ratatui::style::Modifier;
 use ratatui::text::Line;
