@@ -8,6 +8,7 @@ use crate::num_utils::Summable;
 use noisy_float::prelude::*;
 use num_traits::{self, ToPrimitive, Zero};
 use std::error::Error;
+use std::fmt::Display;
 use std::sync::Arc;
 
 pub type HistogramData = Vec<(f32, f32)>;
@@ -48,7 +49,7 @@ fn compute_histogram(d: &Array1<f64>) -> Result<HistogramData, Box<dyn Error>> {
 
 fn analysis_1d<T>(d: Arc<Dataset>) -> Result<AnalysisResult, Box<dyn Error>>
 where
-    T: H5Type + Summable + num_traits::FromPrimitive + Clone + std::fmt::Display + ToPrimitive,
+    T: H5Type + Summable + num_traits::FromPrimitive + Clone + Display + ToPrimitive,
 {
     let mut info: Vec<(String, String)> = Vec::new();
 

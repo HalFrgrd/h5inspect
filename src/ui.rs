@@ -147,8 +147,8 @@ fn render_object_info(frame: &mut Frame, app: &mut App, area: Rect) {
                     let max_bin = hist_data.iter().fold(f32::NEG_INFINITY, |a, &b| a.max(b.0));
 
                     let mut b = textplots::Chart::new(
-                        ((width as f32) * 1.9) as u32,
-                        ((height as f32) * 1.9) as u32,
+                        (width * 2 - 20) as u32,
+                        (height * 2) as u32,
                         min_bin,
                         max_bin,
                     );
@@ -162,7 +162,7 @@ fn render_object_info(frame: &mut Frame, app: &mut App, area: Rect) {
                     let plot = c.to_string();
 
                     for x in plot.split_terminator('\n') {
-                        lines.push(Line::from(x.to_owned()));
+                        lines.push(Line::from(" ".to_owned() + x));
                     }
                 }
             }

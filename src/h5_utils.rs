@@ -6,9 +6,9 @@ use ndarray::arr2;
 use ndarray::Array1;
 use ndarray::Array2;
 use num_format::{Locale, ToFormattedString};
+use rand::distr::{Bernoulli, Distribution};
 use rand::rngs::StdRng;
 use rand::SeedableRng;
-use rand::distr::{Distribution, Bernoulli};
 use std::path::PathBuf;
 
 // Calling group.name() or dataset.name() was very slow for some reason.
@@ -310,10 +310,16 @@ pub fn generate_dummy_file() -> Result<()> {
     // Seeded RNG for reproducibility
     let mut rng = StdRng::seed_from_u64(42);
     let bernoulli = Bernoulli::new(0.5).unwrap(); // Bernoulli distribution with p=0.5
-    let sums_arr: Array1<f32> = Array1::from_vec((0..1000).map(|_| {
-        let sum: f32 = (0..10).map(|_| bernoulli.sample(&mut rng) as u8 as f32).sum(); // Sum of 10 Bernoulli samples
-        sum
-    }).collect());
+    let sums_arr: Array1<f32> = Array1::from_vec(
+        (0..1000)
+            .map(|_| {
+                let sum: f32 = (0..10)
+                    .map(|_| bernoulli.sample(&mut rng) as u8 as f32)
+                    .sum(); // Sum of 10 Bernoulli samples
+                sum
+            })
+            .collect(),
+    );
     let sums_ds = file
         .new_dataset::<f32>()
         .shape(1000)
