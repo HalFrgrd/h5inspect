@@ -4,12 +4,11 @@ use hdf5_metno::{self as hdf5, Dataset};
 use ndarray::{self, Array1};
 // use ndarray_stats::histogram::strategies::{BinsBuildingStrategy, FreedmanDiaconis};
 // use ndarray_stats::histogram::{Grid, Histogram};
+use crate::num_utils::Summable;
 use noisy_float::prelude::*;
 use num_traits::{self, ToPrimitive, Zero};
 use std::error::Error;
 use std::sync::Arc;
-use crate::num_utils::Summable;
-
 
 pub type HistogramData = Vec<(f32, f32)>;
 
@@ -19,8 +18,6 @@ pub enum AnalysisResult {
     NotAvailable,
     Failed(String),
 }
-
-
 
 fn compute_histogram(d: &Array1<f64>) -> Result<HistogramData, Box<dyn Error>> {
     let data: Array1<N64> = d.mapv(|x| n64(x));
@@ -51,16 +48,7 @@ fn compute_histogram(d: &Array1<f64>) -> Result<HistogramData, Box<dyn Error>> {
 
 fn analysis_1d<T>(d: Arc<Dataset>) -> Result<AnalysisResult, Box<dyn Error>>
 where
-    T: H5Type
-        + Summable
-        + num_traits::FromPrimitive
-        + num_traits::Zero
-        + Clone
-        + std::ops::Div<T, Output = T>
-        + ToString
-        + std::fmt::Debug
-        + std::fmt::Display
-        + ToPrimitive
+    T: H5Type + Summable + num_traits::FromPrimitive + Clone + std::fmt::Display + ToPrimitive,
 {
     let mut info: Vec<(String, String)> = Vec::new();
 
@@ -68,18 +56,19 @@ where
 
     info.push(("Data".to_owned(), format!("{}", v)));
 
-    
-    let sum: T::AccumulatorType = v.iter().fold(T::AccumulatorType::zero(), |acc,x| acc + x.to_owned().into() );
+    let sum: T::AccumulatorType = v.iter().fold(T::AccumulatorType::zero(), |acc, x| {
+        acc + x.to_owned().into()
+    });
 
     info.push((
         "mean".to_owned(),
         format!(
             "{:.5}",
-            (sum.to_f64().unwrap_or(f64::NAN) ) / (v.len() as f64)
+            (sum.to_f64().unwrap_or(f64::NAN)) / (v.len() as f64)
         ),
     ));
 
-    let arr_f64: Array1<f64> = v.mapv(|x| x.to_f64().unwrap_or(0.0));
+    let arr_f64: Array1<f64> = v.mapv(|x| x.to_f64().unwrap_or(0.0)); // TODO:
     info.push(("std".to_owned(), format!("{:.5}", arr_f64.std(1.))));
 
     let hist = compute_histogram(&arr_f64)?;

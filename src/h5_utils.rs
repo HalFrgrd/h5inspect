@@ -8,7 +8,7 @@ use ndarray::Array2;
 use num_format::{Locale, ToFormattedString};
 use rand::rngs::StdRng;
 use rand::SeedableRng;
-use rand_distr::{Distribution, Normal};
+use rand::distr::{Distribution, Bernoulli};
 use std::path::PathBuf;
 
 // Calling group.name() or dataset.name() was very slow for some reason.
@@ -309,18 +309,16 @@ pub fn generate_dummy_file() -> Result<()> {
 
     // Seeded RNG for reproducibility
     let mut rng = StdRng::seed_from_u64(42);
-    // Normal distribution: mean=0, std=1
-    let normal = Normal::new(0.0, 1.0).unwrap();
-    // Create a group
-    // let normal_group = file.create_group("anormal")?;
-    // Generate 3 random normal numbers
-    let normal_arr: Array1<f32> =
-        Array1::from_vec((0..1000).map(|_| normal.sample(&mut rng) as f32).collect());
-    let normal_ds = file
+    let bernoulli = Bernoulli::new(0.5).unwrap(); // Bernoulli distribution with p=0.5
+    let sums_arr: Array1<f32> = Array1::from_vec((0..1000).map(|_| {
+        let sum: f32 = (0..10).map(|_| bernoulli.sample(&mut rng) as u8 as f32).sum(); // Sum of 10 Bernoulli samples
+        sum
+    }).collect());
+    let sums_ds = file
         .new_dataset::<f32>()
         .shape(1000)
-        .create("normal_distributed")?;
-    normal_ds.write(&normal_arr)?;
+        .create("sums_of_bernoulli")?;
+    sums_ds.write(&sums_arr)?;
 
     let (ny, nx) = (100, 100);
     let arr = Array2::from_shape_fn((ny, nx), |(j, i)| (1000 * j + i) as f32);
