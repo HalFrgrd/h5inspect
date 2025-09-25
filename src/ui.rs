@@ -1,5 +1,6 @@
 use crate::app::{App, SelectionMode};
 use crate::tree;
+use num_traits::{clamp, SaturatingSub};
 use ratatui::layout::Margin;
 use ratatui::style::Modifier;
 use ratatui::text::Line;
@@ -210,9 +211,24 @@ fn render_search(frame: &mut Frame, app: &mut App, area: Rect) {
             }),
         );
 
-    let (search_query_text, search_query_cursor_pos) =
-        app.search_query_and_cursor((area.width - 3).into());
-    let search_query = Paragraph::new(search_query_text.as_str()).block(search_block);
+    let (search_query_text, mut search_query_cursor_pos) = app.search_query_and_cursor();
+
+    let view_width = area.width - 2;
+    let min_offset = search_query_cursor_pos.saturating_sub(view_width);
+    let max_offset = std::cmp::max(
+        search_query_cursor_pos.saturating_sub(view_width / 2),
+        min_offset,
+    );
+    app.search_query_view_offset = clamp(app.search_query_view_offset, min_offset, max_offset);
+    log::debug!("{}", app.search_query_view_offset);
+    search_query_cursor_pos = search_query_cursor_pos.saturating_sub(app.search_query_view_offset);
+    let visible_search_query: String = search_query_text
+        .chars()
+        .skip(app.search_query_view_offset.into())
+        .take(view_width.into())
+        .collect();
+
+    let search_query = Paragraph::new(visible_search_query).block(search_block);
     frame.render_widget(search_query, area);
     match app.mode {
         SelectionMode::SearchQueryEditing => {

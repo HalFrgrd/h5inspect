@@ -48,6 +48,7 @@ pub struct App {
     pub filtered_tree: Option<TreeNode<NodeIdT>>,
     pub search_query_left: String,
     pub search_query_right: String,
+    pub search_query_view_offset: u16,
     pub mode: SelectionMode,
     pub show_logs: bool,
     pub object_info_scroll_state: u16,
@@ -88,6 +89,7 @@ impl App {
             filtered_tree: None,
             search_query_left: String::new(),
             search_query_right: String::new(),
+            search_query_view_offset: 0,
             mode: SelectionMode::TreeBrowsing,
             show_logs: cfg!(debug_assertions),
             object_info_scroll_state: 0,
@@ -336,16 +338,12 @@ impl App {
         }
     }
 
-    pub fn search_query_and_cursor(&self, max_len: usize) -> (String, usize) {
+    pub fn search_query_and_cursor(&self) -> (String, u16) {
         let rev_right: String = self.search_query_right.chars().rev().collect();
         let text = self.search_query_left.clone() + &rev_right;
         let cursor_pos = self.search_query_left.len();
 
-        if cursor_pos > max_len {
-            return (last_chars(&text, max_len).into(), max_len);
-        } else {
-            return (first_chars(&text, max_len).into(), cursor_pos);
-        }
+        (text, cursor_pos.try_into().unwrap())
     }
 
     fn on_tab(&mut self) -> () {
@@ -449,7 +447,7 @@ impl App {
     }
 
     fn update_filtered_tree(&mut self) {
-        let query = &self.search_query_and_cursor(usize::MAX).0;
+        let query = &self.search_query_and_cursor().0;
         match &self.tree {
             Some(tree) => {
                 self.filtered_tree = tree.filter(query);
