@@ -220,7 +220,6 @@ fn render_search(frame: &mut Frame, app: &mut App, area: Rect) {
         min_offset,
     );
     app.search_query_view_offset = clamp(app.search_query_view_offset, min_offset, max_offset);
-    log::debug!("{}", app.search_query_view_offset);
     search_query_cursor_pos = search_query_cursor_pos.saturating_sub(app.search_query_view_offset);
     let visible_search_query: String = search_query_text
         .chars()
