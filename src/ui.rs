@@ -9,7 +9,7 @@ use ratatui::{
     style::{Color, Style},
     widgets::{
         Block, BorderType, Borders, Cell, Paragraph, Row, Scrollbar, ScrollbarOrientation,
-        ScrollbarState, Table, TableState, Wrap,
+        ScrollbarState, Table, TableState,
     },
     Frame,
 };
@@ -18,7 +18,6 @@ use tui_logger;
 use tui_tree_widget::Tree as WidgetTreeRoot;
 use tui_tree_widget::TreeItem as WidgetTreeItem;
 
-use core::f32;
 use std::hash::Hash;
 const STYLE_HIGHLIGHT: Style = Style::new().bg(Color::DarkGray);
 const STYLE_DEFAULT_TEXT: Style = Style::new().fg(Color::White);
@@ -114,50 +113,28 @@ fn render_object_info(frame: &mut Frame, app: &mut App, area: Rect) {
     let mut rows = vec![];
 
     let selected = app.tree_state.selected().to_vec();
-    let mut paragraph = Paragraph::new("Select on the left".to_string());
     if !selected.is_empty() {
         // selected is of form: ["/group1", "/group1/dataset1"]
         let info = app.get_text_for(&selected);
         if let Some((info, hist_data_opt)) = info {
-            let mut lines = vec![];
-
-            let rowsWithSubRows = info
-                .iter()
-                .map(|(k, v)| {
+            info.iter()
+                .for_each(|(k, v)| {
                     v.split('\n')
                         .enumerate()
-                        .map(|(i, subrow)| {
-                            let subRowK = if i == 0 { k } else { "" };
-                            vec![
-                                Cell::from(Text::from(subRowK.to_owned())),
+                        .for_each(|(i, subrow)| {
+                            let sub_row_k = if i == 0 { k } else { "" };
+                            rows.push(Row::new([
+                                Cell::from(Text::from(sub_row_k.to_owned())),
                                 Cell::from(Text::from(subrow.to_owned()).style(STYLE_MAGENTA)),
-                            ]
-                        })
-                        .collect::<Vec<_>>()
-                })
-                .collect::<Vec<Vec<Vec<Cell>>>>();
-
-            for rowWithSubRow in rowsWithSubRows {
-                for row in rowWithSubRow {
-                    rows.push(Row::new(row));
-                }
-            }
-
-            paragraph = Paragraph::new(lines).wrap(Wrap { trim: false });
+                            ]));
+                        });
+                });
         }
     }
 
     let num_lines_when_rendered: u16 = rows.len().try_into().unwrap();
     let max_scroll_state = num_lines_when_rendered.saturating_sub(area.height - 2);
     app.object_info_scroll_state = app.object_info_scroll_state.clamp(0, max_scroll_state);
-
-    // frame.render_widget(
-    //     paragraph
-    //         .clone()
-    //         .block(object_info)
-    //         .scroll((app.object_info_scroll_state, 0)),
-    //     area,
-    // );
 
     let widths = [Constraint::Min(20), Constraint::Percentage(100)];
 
