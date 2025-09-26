@@ -8,14 +8,15 @@ use ratatui::layout::Margin;
 use ratatui::style::Modifier;
 use ratatui::text::{Line, Span, Text};
 use ratatui::{
-    layout::{Constraint, Layout, Position, Rect},
+    layout::{Constraint, Flex, Layout, Position, Rect},
     style::{Color, Style},
     widgets::{
-        Block, BorderType, Borders, Cell, Paragraph, Row, Scrollbar, ScrollbarOrientation,
+        Block, BorderType, Borders, Cell, Clear, Paragraph, Row, Scrollbar, ScrollbarOrientation,
         ScrollbarState, Table, TableState,
     },
     Frame,
 };
+use tui_big_text::{BigText, PixelSize};
 use tui_logger;
 use tui_tree_widget::Tree as WidgetTreeRoot;
 use tui_tree_widget::TreeItem as WidgetTreeItem;
@@ -54,6 +55,10 @@ pub fn ui(frame: &mut Frame, app: &mut App) {
         render_logger(frame, right_layout[1]);
     }
     render_object_info(frame, app, object_info_area);
+
+    if let SelectionMode::HelpScreen = app.mode {
+        render_help_screen(frame, popup_area(frame.area(), 80, 80));
+    }
     app.set_last_object_info_area(object_info_area);
     app.set_last_tree_area(left_layout[0]);
     app.set_last_search_query_area(left_layout[1]);
@@ -289,7 +294,7 @@ fn render_logger(frame: &mut Frame, area: Rect) {
     let logger_widget = tui_logger::TuiLoggerWidget::default()
         .block(
             Block::bordered()
-                .title("Logs (toggle with '?')")
+                .title("Logs (toggle with 'L')")
                 .borders(Borders::ALL)
                 .border_type(BorderType::Rounded)
                 .border_style(Style::default().fg(Color::Blue)),
@@ -301,4 +306,67 @@ fn render_logger(frame: &mut Frame, area: Rect) {
         .output_file(false)
         .output_line(false);
     frame.render_widget(logger_widget, area);
+}
+
+/// helper function to create a centered rect using up certain percentage of the available rect `r`
+fn popup_area(area: Rect, percent_x: u16, percent_y: u16) -> Rect {
+    let vertical = Layout::vertical([Constraint::Percentage(percent_y)]).flex(Flex::Center);
+    let horizontal = Layout::horizontal([Constraint::Percentage(percent_x)]).flex(Flex::Center);
+    let [area] = vertical.areas(area);
+    let [area] = horizontal.areas(area);
+    area
+}
+
+fn render_help_screen(frame: &mut Frame, area: Rect) {
+    let help_block = Block::new()
+        .title("Help")
+        .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
+        .border_style(Style::default().fg(Color::Red));
+
+    frame.render_widget(Clear, area);
+    frame.render_widget(help_block, area);
+
+    let [title_area, text_area] =
+        Layout::vertical([Constraint::Min(20), Constraint::Percentage(100)])
+            .areas(area.inner(Margin::new(3, 3)));
+
+    let big_text = BigText::builder()
+        .pixel_size(PixelSize::Full)
+        .lines(vec![
+            Line::styled(
+                "h5inspect",
+                Style::new().fg(Color::Red).add_modifier(Modifier::BOLD),
+            ),
+        ])
+        .centered()
+        .build();
+    frame.render_widget(big_text, title_area);
+
+    let help_text = Text::from(vec![
+        Line::from("h5inspect - Simple TUI to inspect h5 files"),
+        Line::from(""),
+        Line::from("Key bindings:"),
+        Line::from("  Up/Down/Left/Right: Navigate tree"),
+        Line::from("  Enter: Expand/collapse group"),
+        Line::from("  /: Start editing search query"),
+        Line::from("  Esc: Stop editing search query"),
+        Line::from("  Backspace: Delete last character in search query"),
+        Line::from("  Ctrl+U: Clear search query"),
+        Line::from("  n: Jump to next match in tree"),
+        Line::from("  N: Jump to previous match in tree"),
+        Line::from("  i: Inspect object info (if any)"),
+        Line::from("  o: Stop inspecting object info"),
+        Line::from("  ?: Toggle this help screen"),
+        Line::from("  l: Toggle log view"),
+        Line::from("  q: Quit"),
+        Line::from(""),
+        Line::from("Press any key to close this help screen."),
+    ]);
+    let help_paragraph = Paragraph::new(help_text)
+        // .block(help_block)
+        .style(STYLE_DEFAULT_TEXT)
+        .alignment(ratatui::layout::Alignment::Left)
+        .wrap(ratatui::widgets::Wrap { trim: true });
+    frame.render_widget(help_paragraph, text_area);
 }

@@ -63,6 +63,7 @@ pub enum SelectionMode {
     TreeBrowsing,
     SearchQueryEditing,
     ObjectInfoInspecting,
+    HelpScreen,
 }
 
 impl App {
@@ -77,7 +78,7 @@ impl App {
             search_query_left: String::new(),
             search_query_right: String::new(),
             search_query_view_offset: 0,
-            mode: SelectionMode::TreeBrowsing,
+            mode: SelectionMode::HelpScreen,
             show_logs: cfg!(debug_assertions),
             object_info_scroll_state: 0,
             last_object_info_area: Rect::new(0, 0, 0, 0),
@@ -235,7 +236,7 @@ impl App {
         }
     }
 
-    fn on_keypress_normal_mode(&mut self, keycode: KeyCode) -> () {
+    fn on_keypress_tree_mode(&mut self, keycode: KeyCode) -> () {
         match keycode {
             KeyCode::Left => {
                 if self.filtered_tree.is_some() {
@@ -304,8 +305,11 @@ impl App {
                     self.tree_state.select_last();
                 }
             }
-            KeyCode::Char('?') => {
+            KeyCode::Char('L') => {
                 self.show_logs = !self.show_logs;
+            }
+            KeyCode::Char('?') => {
+                self.mode = SelectionMode::HelpScreen;
             }
             KeyCode::PageDown => {
                 if self.filtered_tree.is_some() {
@@ -394,7 +398,7 @@ impl App {
             }
             keycode => {
                 refresh_filtered_tree = false;
-                self.on_keypress_normal_mode(keycode);
+                self.on_keypress_tree_mode(keycode);
             }
         };
         if refresh_filtered_tree {
@@ -427,6 +431,9 @@ impl App {
                 self.object_info_scroll_state = 0;
             }
             KeyCode::Char('?') => {
+                self.mode = SelectionMode::HelpScreen;
+            }
+            KeyCode::Char('L') => {
                 self.show_logs = !self.show_logs;
             }
             _ => {}
@@ -559,7 +566,7 @@ impl App {
                         self.mode = SelectionMode::SearchQueryEditing;
                     }
                     other => {
-                        self.on_keypress_normal_mode(other);
+                        self.on_keypress_tree_mode(other);
                     }
                 },
                 SelectionMode::SearchQueryEditing => match key.code {
@@ -580,6 +587,12 @@ impl App {
                     other => {
                         self.on_keypress_object_info_mode(other);
                     }
+                },
+                SelectionMode::HelpScreen => match key.code {
+                    KeyCode::Esc | KeyCode::Enter | KeyCode::Char('q') | KeyCode::Char('?') => {
+                        self.mode = SelectionMode::TreeBrowsing;
+                    }
+                    _ => {}
                 },
             }
         }
