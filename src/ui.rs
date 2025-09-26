@@ -3,17 +3,17 @@ use crate::tree;
 use num_traits::clamp;
 use ratatui::layout::Margin;
 use ratatui::style::Modifier;
-use ratatui::text::Line;
-use ratatui::text::Span;
-use ratatui::widgets::ScrollbarState;
+use ratatui::text::{Line, Span, Text};
 use ratatui::{
     layout::{Constraint, Layout, Position, Rect},
     style::{Color, Style},
-    widgets::{Block, BorderType, Borders, Paragraph, Scrollbar, ScrollbarOrientation, Wrap},
+    widgets::{
+        Block, BorderType, Borders, Cell, Paragraph, Row, Scrollbar, ScrollbarOrientation,
+        ScrollbarState, Table, TableState, Wrap,
+    },
     Frame,
 };
-use textplots;
-use textplots::Plot;
+
 use tui_logger;
 use tui_tree_widget::Tree as WidgetTreeRoot;
 use tui_tree_widget::TreeItem as WidgetTreeItem;
@@ -111,6 +111,8 @@ fn render_object_info(frame: &mut Frame, app: &mut App, area: Rect) {
 
     // frame.render_widget(object_info, area);
 
+    let mut rows = vec![];
+
     let selected = app.tree_state.selected().to_vec();
     let mut paragraph = Paragraph::new("Select on the left".to_string());
     if !selected.is_empty() {
@@ -119,53 +121,25 @@ fn render_object_info(frame: &mut Frame, app: &mut App, area: Rect) {
         if let Some((info, hist_data_opt)) = info {
             let mut lines = vec![];
 
-            for (key, value) in info {
-                let lines_in_value: Vec<_> = value.split('\n').map(|s| s.to_string()).collect();
-                let key_width = 24_usize;
-                let spacing = " ".repeat(key_width.saturating_sub(key.chars().count()));
+            let rowsWithSubRows = info
+                .iter()
+                .map(|(k, v)| {
+                    v.split('\n')
+                        .enumerate()
+                        .map(|(i, subrow)| {
+                            let subRowK = if i == 0 { k } else { "" };
+                            vec![
+                                Cell::from(Text::from(subRowK.to_owned())),
+                                Cell::from(Text::from(subrow.to_owned()).style(STYLE_MAGENTA)),
+                            ]
+                        })
+                        .collect::<Vec<_>>()
+                })
+                .collect::<Vec<Vec<Vec<Cell>>>>();
 
-                // First line with key
-                lines.push(Line::from(vec![
-                    Span::raw(key),
-                    Span::raw(spacing),
-                    Span::styled(lines_in_value[0].clone(), STYLE_MAGENTA),
-                ]));
-
-                // Subsequent lines indented
-                for line in lines_in_value.iter().skip(1) {
-                    lines.push(Line::from(vec![
-                        Span::raw(" ".repeat(key_width)),
-                        Span::styled(line.clone(), STYLE_MAGENTA),
-                    ]));
-                }
-            }
-
-            let width = area.width - 2;
-            let height = area.height - 2;
-            if width > 32 && height > 10 {
-                if let Some(hist_data) = hist_data_opt {
-                    // Get min of first elements, default to -10.0
-                    let min_bin = hist_data.iter().fold(f32::INFINITY, |a, &b| a.min(b.0));
-                    let max_bin = hist_data.iter().fold(f32::NEG_INFINITY, |a, &b| a.max(b.0));
-
-                    let mut b = textplots::Chart::new(
-                        (width * 2 - 20) as u32,
-                        (height * 2) as u32,
-                        min_bin,
-                        max_bin,
-                    );
-
-                    let a = textplots::Shape::Bars(&hist_data);
-                    let c = b.lineplot(&a);
-                    c.borders();
-                    c.axis();
-                    c.figures();
-
-                    let plot = c.to_string();
-
-                    for x in plot.split_terminator('\n') {
-                        lines.push(Line::from(" ".to_owned() + x));
-                    }
+            for rowWithSubRow in rowsWithSubRows {
+                for row in rowWithSubRow {
+                    rows.push(Row::new(row));
                 }
             }
 
@@ -173,22 +147,28 @@ fn render_object_info(frame: &mut Frame, app: &mut App, area: Rect) {
         }
     }
 
-    let num_lines_when_rendered: u16 = paragraph.line_count(area.width).try_into().unwrap();
+    let num_lines_when_rendered: u16 = rows.len().try_into().unwrap();
     let max_scroll_state = num_lines_when_rendered.saturating_sub(area.height - 2);
     app.object_info_scroll_state = app.object_info_scroll_state.clamp(0, max_scroll_state);
+
+    // frame.render_widget(
+    //     paragraph
+    //         .clone()
+    //         .block(object_info)
+    //         .scroll((app.object_info_scroll_state, 0)),
+    //     area,
+    // );
+
+    let widths = [Constraint::Min(20), Constraint::Percentage(100)];
+
+    let table = Table::new(rows, widths);
+    let mut table_scroll = TableState::new().with_offset(app.object_info_scroll_state.into());
+    frame.render_stateful_widget(table.block(object_info), area, &mut table_scroll);
 
     let mut scrollbar_state = ScrollbarState::default()
         .content_length(max_scroll_state.into())
         .viewport_content_length((area.height).into())
         .position(app.object_info_scroll_state.into());
-
-    frame.render_widget(
-        paragraph
-            .clone()
-            .block(object_info)
-            .scroll((app.object_info_scroll_state, 0)),
-        area,
-    );
 
     frame.render_stateful_widget(
         Scrollbar::new(ScrollbarOrientation::VerticalRight)
