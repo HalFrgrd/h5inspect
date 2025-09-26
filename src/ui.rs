@@ -95,7 +95,9 @@ fn render_object_info(frame: &mut Frame, app: &mut App, area: Rect) {
     let object_info = Block::new()
         .title("Object info")
         .title_bottom(
-            Line::from(format!("num analysis tasks: {}", num_active_tasks)).left_aligned(),
+            Line::from(format!("# background analysis tasks: {}", num_active_tasks))
+                .left_aligned()
+                .style(STYLE_DEFAULT_TEXT.add_modifier(Modifier::DIM)),
         )
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
