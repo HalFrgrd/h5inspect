@@ -8,6 +8,7 @@ use crossterm::event::{MouseButton, MouseEventKind};
 use hdf5_metno as hdf5;
 
 use dirs;
+use log;
 use ratatui::crossterm::event::{KeyCode, KeyModifiers};
 use ratatui::layout::{Position, Rect};
 use std::collections::HashMap;
@@ -15,9 +16,6 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::vec;
 use tokio;
-
-#[allow(unused_imports)]
-use log::*;
 
 #[derive(Debug, Clone)]
 pub enum Hdf5Object {
@@ -78,7 +76,9 @@ impl App {
             } else {
                 // create the config dir to mark that the user has run the app at least once
                 if let Err(e) = std::fs::create_dir(&app_config_dir) {
-                    error!("Failed to create config dir {:?}: {}", app_config_dir, e);
+                    log::error!("Failed to create config dir {:?}: {}", app_config_dir, e);
+                } else {
+                    log::info!("Created config dir {:?}", app_config_dir);
                 }
             }
         }
@@ -216,17 +216,17 @@ impl App {
                         Some((h5_utils::get_text_for_group(&group, size), None))
                     }
                     None => {
-                        debug!("No hdf5 object found at path {:?}", path);
+                        log::debug!("No hdf5 object found at path {:?}", path);
                         None
                     }
                 },
                 None => {
-                    debug!("Couldn't find object at path {:?}", path);
+                    log::debug!("Couldn't find object at path {:?}", path);
                     None
                 }
             }
         } else {
-            debug!("No tree found");
+            log::debug!("No tree found");
             None
         }
     }

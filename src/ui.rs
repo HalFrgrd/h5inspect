@@ -176,7 +176,10 @@ fn render_object_info(frame: &mut Frame, app: &mut App, area: Rect) {
                     .for_each(|(i, subrow)| {
                         let sub_row_k = if i == 0 { k } else { "" };
                         rows.push(Row::new([
-                            Cell::from(Text::from(sub_row_k.to_owned())),
+                            Cell::from(
+                                Text::from(sub_row_k.to_owned())
+                                    .style(get_style(Styles::DefaultText, app.mode)),
+                            ),
                             Cell::from(
                                 Text::from(subrow.to_owned())
                                     .style(get_style(Styles::Magenta, app.mode)),
