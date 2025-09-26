@@ -366,10 +366,12 @@ pub fn generate_dummy_file() -> Result<()> {
 
     let group1 = file.create_group("group1")?;
     let group1_d1 = group1
-        .new_dataset::<i32>()
-        .shape((ny, nx))
+        .new_dataset::<bool>()
+        .shape((10,))
         .create("something")?;
-    group1_d1.write(&arr)?;
+    group1_d1.write(&vec![
+        true, false, true, true, false, true, true, false, true, false,
+    ])?;
 
     // Create a dataset with variable-length strings
     let dataset: hdf5::Dataset = group1

@@ -1,10 +1,9 @@
+use crate::num_utils::{IsNan, MyToPrimitive, Summable};
+use core::f64;
 #[allow(unused_imports)]
 use hdf5::{File, H5Type};
 use hdf5_metno::{self as hdf5, Dataset};
 use ndarray::{self, Array1};
-
-use crate::num_utils::{IsNan, Summable};
-use core::f64;
 use num_traits::{self, ToPrimitive, Zero};
 use std::error::Error;
 use std::fmt::Display;
@@ -56,7 +55,7 @@ fn compute_histogram(d: &Array1<f64>) -> Result<HistogramData, Box<dyn Error>> {
 
 fn analysis_1d<T>(d: Arc<Dataset>) -> Result<AnalysisResult, Box<dyn Error>>
 where
-    T: H5Type + Summable + IsNan + num_traits::FromPrimitive + Clone + Display + ToPrimitive,
+    T: H5Type + Summable + IsNan + Clone + Display + MyToPrimitive,
 {
     let mut info: Vec<(String, String)> = Vec::new();
 
@@ -81,7 +80,7 @@ where
         v.mapv(|x| x.my_is_nan() as u32).sum().to_string(),
     ));
 
-    let arr_f64: Array1<f64> = v.mapv(|x| x.to_f64().unwrap_or(f64::NAN));
+    let arr_f64: Array1<f64> = v.mapv(|x| x.my_to_f64().unwrap_or(f64::NAN));
     info.push(("Std".to_owned(), format!("{:.5}", arr_f64.std(1.))));
 
     let hist = compute_histogram(&arr_f64)?;
@@ -115,6 +114,8 @@ pub fn hdf5_dataset_analysis(d: Arc<Dataset>) -> Result<AnalysisResult, Box<dyn 
         analysis_1d::<i64>(d)
     } else if dtype.is::<u64>() {
         analysis_1d::<u64>(d)
+    } else if dtype.is::<bool>() {
+        analysis_1d::<bool>(d)
     } else {
         Ok(AnalysisResult::NotAvailable)
     }
