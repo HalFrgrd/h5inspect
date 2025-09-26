@@ -10,6 +10,7 @@ mod analysis;
 mod app;
 mod events;
 mod h5_utils;
+mod hist_plot;
 mod num_utils;
 mod tree;
 mod ui;
