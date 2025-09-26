@@ -5,7 +5,7 @@ use ndarray::{self, Array1};
 // use ndarray_stats::histogram::strategies::{BinsBuildingStrategy, FreedmanDiaconis};
 // use ndarray_stats::histogram::{Grid, Histogram};
 use crate::num_utils::Summable;
-use noisy_float::prelude::*;
+use core::f64;
 use num_traits::{self, ToPrimitive, Zero};
 use std::error::Error;
 use std::fmt::Display;
@@ -21,27 +21,35 @@ pub enum AnalysisResult {
 }
 
 fn compute_histogram(d: &Array1<f64>) -> Result<HistogramData, Box<dyn Error>> {
-    let data: Array1<N64> = d.mapv(|x| n64(x));
-
     let n_bins = 30; // Number of bins
-    let min = data.iter().min().unwrap().clone();
-    let max = data.iter().max().unwrap().clone();
-    let bin_width = (max - min) / n64(n_bins as f64);
+    let min = d.iter().fold(f64::INFINITY, |acc, &x| f64::min(acc, x));
+    let max = d.iter().fold(f64::NEG_INFINITY, |acc, &x| f64::max(acc, x));
+    let bin_width = (max - min) / n_bins as f64;
+
+    if min.is_infinite() || max.is_infinite() || bin_width <= 0.0 {
+        return Err(format!(
+            "Problem with histogram gen: min = {}, max = {}, bin_width = {}",
+            min, max, bin_width
+        )
+        .into());
+    }
 
     let mut counts = vec![0; n_bins];
-    for &value in data.iter() {
-        let bin_index = ((value - min) / bin_width).floor().to_usize().unwrap();
-        if bin_index < n_bins {
-            counts[bin_index] += 1;
+    for &value in d.iter() {
+        if !value.is_nan() {
+            let bin_index = ((value - min) / bin_width).floor() as usize;
+            if bin_index < n_bins {
+                counts[bin_index] += 1;
+            }
         }
     }
 
     // Convert to Vec<(bin_center, count)> as f32
     let mut result = Vec::new();
     for i in 0..n_bins {
-        let bin_center = min + (bin_width * n64(i as f64)) + (bin_width / n64(2.0));
+        let bin_center = min + (bin_width * (i as f64)) + (bin_width / 2.0);
         let count = counts[i] as f32;
-        result.push((bin_center.raw() as f32, count));
+        result.push((bin_center as f32, count));
     }
 
     Ok(result)
