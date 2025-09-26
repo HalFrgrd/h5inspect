@@ -25,3 +25,36 @@ macro_rules! impl_summable_for_numbers {
 impl_summable_for_numbers!(i8, i16, i32, i64; i64);
 impl_summable_for_numbers!(u8, u16, u32, u64; u64);
 impl_summable_for_numbers!(f32, f64; f64);
+
+pub trait IsNan {
+    fn my_is_nan(&self) -> bool;
+}
+
+macro_rules! impl_isnan_for_floats {
+    ($($t:ty),*) => {
+        $(
+            impl IsNan for $t {
+                fn my_is_nan(&self) -> bool {
+                    self.is_nan()
+                }
+            }
+        )*
+    };
+}
+
+impl_isnan_for_floats!(f32, f64);
+
+macro_rules! impl_isnan_for_ints {
+
+    ($($t:ty),*) => {
+        $(
+            impl IsNan for $t {
+                fn my_is_nan(&self) -> bool {
+                    false
+                }
+            }
+        )*
+    };
+}
+
+impl_isnan_for_ints!(i8, i16, i32, i64, u8, u16, u32, u64);
