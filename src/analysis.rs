@@ -10,7 +10,7 @@ use std::error::Error;
 use std::fmt::Display;
 use std::sync::Arc;
 
-pub type HistogramData = Vec<(f32, f32)>;
+pub type HistogramData = Vec<(f32, u32)>;
 
 #[derive(Debug)]
 pub enum AnalysisResult {
@@ -47,7 +47,7 @@ fn compute_histogram(d: &Array1<f64>) -> Result<HistogramData, Box<dyn Error>> {
     let mut result = Vec::new();
     for i in 0..n_bins {
         let bin_center = min + (bin_width * (i as f64)) + (bin_width / 2.0);
-        let count = counts[i] as f32;
+        let count = counts[i];
         result.push((bin_center as f32, count));
     }
 

@@ -1,6 +1,9 @@
 use crate::app::{App, SelectionMode};
+use crate::hist_plot;
 use crate::tree;
+
 use num_traits::clamp;
+
 use ratatui::layout::Margin;
 use ratatui::style::Modifier;
 use ratatui::text::{Line, Span, Text};
@@ -13,14 +16,10 @@ use ratatui::{
     },
     Frame,
 };
-
-use crate::hist_plot;
-
 use tui_logger;
 use tui_tree_widget::Tree as WidgetTreeRoot;
 use tui_tree_widget::TreeItem as WidgetTreeItem;
 
-use std::hash::Hash;
 const STYLE_HIGHLIGHT: Style = Style::new().bg(Color::DarkGray);
 const STYLE_DEFAULT_TEXT: Style = Style::new().fg(Color::White);
 const STYLE_MATCH: Style = Style::new().fg(Color::Red).add_modifier(Modifier::BOLD);
@@ -56,7 +55,7 @@ pub fn ui(frame: &mut Frame, app: &mut App) {
 }
 impl<IdT> tree::TreeNode<IdT>
 where
-    IdT: Eq + Hash + Clone + std::fmt::Debug,
+    IdT: Eq + std::hash::Hash + Clone + std::fmt::Debug,
 {
     pub fn into_tree_item(&self) -> WidgetTreeItem<'_, IdT> {
         let children: Vec<_> = self
@@ -175,8 +174,10 @@ fn render_object_info(frame: &mut Frame, app: &mut App, area: Rect) {
         &mut scrollbar_state,
     );
 
-    let histogram_widget = hist_plot::histogram_widget();
-    frame.render_widget(histogram_widget, chart_area);
+    if let Some(hist_data) = histogram_data {
+        let histogram_widget = hist_plot::histogram_widget(&hist_data);
+        frame.render_widget(histogram_widget, chart_area);
+    }
 }
 
 fn render_search(frame: &mut Frame, app: &mut App, area: Rect) {
