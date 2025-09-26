@@ -595,7 +595,6 @@ impl App {
                     .contains(Position::new(mouse.column, mouse.row))
                 {
                     self.object_info_scroll_state = self.object_info_scroll_state.saturating_add(1);
-                    self.mode = SelectionMode::ObjectInfoInspecting;
                 } else if self
                     .last_tree_area
                     .contains(Position::new(mouse.column, mouse.row))
@@ -609,7 +608,6 @@ impl App {
                     .contains(Position::new(mouse.column, mouse.row))
                 {
                     self.object_info_scroll_state = self.object_info_scroll_state.saturating_sub(1);
-                    self.mode = SelectionMode::ObjectInfoInspecting;
                 } else if self
                     .last_tree_area
                     .contains(Position::new(mouse.column, mouse.row))

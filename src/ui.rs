@@ -170,12 +170,13 @@ fn render_object_info(frame: &mut Frame, app: &mut App, area: Rect) {
             .begin_symbol(None)
             .track_symbol(None)
             .end_symbol(None),
-        table_area.inner(Margin::new(0, 1)),
+        area.inner(Margin::new(0, 1)),
         &mut scrollbar_state,
     );
 
     if let Some(hist_data) = histogram_data {
-        let histogram_widget = hist_plot::histogram_widget(&hist_data);
+        let histogram_widget =
+            hist_plot::histogram_widget(&hist_data, chart_area.height, chart_area.width);
         frame.render_widget(histogram_widget, chart_area);
     }
 }
@@ -197,10 +198,7 @@ fn render_search(frame: &mut Frame, app: &mut App, area: Rect) {
 
     let view_width = area.width - 2;
     let min_offset = search_query_cursor_pos.saturating_sub(view_width);
-    let max_offset = std::cmp::max(
-        search_query_cursor_pos.saturating_sub(view_width / 2),
-        min_offset,
-    );
+    let max_offset = min_offset.max(search_query_cursor_pos.saturating_sub(view_width / 2));
     app.search_query_view_offset = clamp(app.search_query_view_offset, min_offset, max_offset);
     search_query_cursor_pos = search_query_cursor_pos.saturating_sub(app.search_query_view_offset);
     let visible_search_query: String = search_query_text

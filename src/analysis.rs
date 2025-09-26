@@ -23,7 +23,7 @@ fn compute_histogram(d: &Array1<f64>) -> Result<HistogramData, Box<dyn Error>> {
     let n_bins = 30; // Number of bins
     let min = d.iter().fold(f64::INFINITY, |acc, &x| f64::min(acc, x));
     let max = d.iter().fold(f64::NEG_INFINITY, |acc, &x| f64::max(acc, x));
-    let bin_width = (max - min) / n_bins as f64;
+    let bin_width = (max - min) / (n_bins - 1) as f64;
 
     if !min.is_finite() || !max.is_finite() || bin_width <= 0.0 {
         return Err(format!(
