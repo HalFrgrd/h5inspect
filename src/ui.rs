@@ -355,6 +355,15 @@ fn render_help_screen(frame: &mut Frame, app: &App, area: Rect) {
         Layout::vertical([Constraint::Min(20), Constraint::Percentage(100)])
             .areas(area.inner(Margin::new(3, 3)));
 
+    let [_, main_title_area, _] = Layout::horizontal([
+        Constraint::Fill(1),
+        Constraint::Min(80),
+        Constraint::Fill(1),
+    ])
+    .areas(title_area);
+    let [main_title_area, version_area] =
+        Layout::vertical([Constraint::Length(8), Constraint::Length(10)]).areas(main_title_area);
+
     let big_text = BigText::builder()
         .pixel_size(PixelSize::Full)
         .lines(vec![Line::styled(
@@ -363,27 +372,55 @@ fn render_help_screen(frame: &mut Frame, app: &App, area: Rect) {
         )])
         .centered()
         .build();
-    frame.render_widget(big_text, title_area);
 
+    frame.render_widget(big_text, main_title_area);
+
+    let big_text_version = BigText::builder()
+        .pixel_size(PixelSize::Sextant)
+        .lines(vec![Line::styled(
+            format!("v{}", env!("CARGO_PKG_VERSION")),
+            Style::new().fg(Color::Red).add_modifier(Modifier::BOLD),
+        )])
+        .right_aligned()
+        .build();
+    frame.render_widget(big_text_version, version_area);
+
+    const KEY_BINDING_TITLE_STYLE: Style =
+        Style::new().fg(Color::Cyan).add_modifier(Modifier::BOLD);
+    const KEY_BINDING_STYLE: Style = Style::new().fg(Color::Yellow);
+    const DEFAULT_TEXT_STYLE: Style = Style::new().fg(Color::White);
     let help_text = Text::from(vec![
         Line::from("h5inspect - Simple TUI to inspect h5 files"),
         Line::from(""),
-        Line::from("Key bindings:"),
-        Line::from("  Up/Down/Left/Right: Navigate tree"),
-        Line::from("  Enter: Expand/collapse group"),
-        Line::from("  /: Start editing search query"),
-        Line::from("  Esc: Stop editing search query"),
-        Line::from("  Backspace: Delete last character in search query"),
-        Line::from("  Ctrl+U: Clear search query"),
-        Line::from("  n: Jump to next match in tree"),
-        Line::from("  N: Jump to previous match in tree"),
-        Line::from("  i: Inspect object info (if any)"),
-        Line::from("  o: Stop inspecting object info"),
-        Line::from("  ?: Toggle this help screen"),
-        Line::from("  l: Toggle log view"),
-        Line::from("  q: Quit"),
+        Line::from("Key bindings:").style(KEY_BINDING_TITLE_STYLE),
+        Line::from("  Up/Down/Left/Right:").style(KEY_BINDING_STYLE),
+        Line::from("    Navigate tree").style(DEFAULT_TEXT_STYLE),
+        Line::from("  Enter:").style(KEY_BINDING_STYLE),
+        Line::from("    Expand/collapse group").style(DEFAULT_TEXT_STYLE),
+        Line::from("  /:").style(KEY_BINDING_STYLE),
+        Line::from("    Start editing search query").style(DEFAULT_TEXT_STYLE),
+        Line::from("  Esc:").style(KEY_BINDING_STYLE),
+        Line::from("    Stop editing search query").style(DEFAULT_TEXT_STYLE),
+        Line::from("  Backspace:").style(KEY_BINDING_STYLE),
+        Line::from("    Delete last character in search query").style(DEFAULT_TEXT_STYLE),
+        Line::from("  Ctrl+U:").style(KEY_BINDING_STYLE),
+        Line::from("    Clear search query").style(DEFAULT_TEXT_STYLE),
+        Line::from("  n:").style(KEY_BINDING_STYLE),
+        Line::from("    Jump to next match in tree").style(DEFAULT_TEXT_STYLE),
+        Line::from("  N:").style(KEY_BINDING_STYLE),
+        Line::from("    Jump to previous match in tree").style(DEFAULT_TEXT_STYLE),
+        Line::from("  i:").style(KEY_BINDING_STYLE),
+        Line::from("    Inspect object info (if any)").style(DEFAULT_TEXT_STYLE),
+        Line::from("  o:").style(KEY_BINDING_STYLE),
+        Line::from("    Stop inspecting object info").style(DEFAULT_TEXT_STYLE),
+        Line::from("  ?:").style(KEY_BINDING_STYLE),
+        Line::from("    Toggle this help screen").style(DEFAULT_TEXT_STYLE),
+        Line::from("  l:").style(KEY_BINDING_STYLE),
+        Line::from("    Toggle log view").style(DEFAULT_TEXT_STYLE),
+        Line::from("  q:").style(KEY_BINDING_STYLE),
+        Line::from("    Quit").style(DEFAULT_TEXT_STYLE),
         Line::from(""),
-        Line::from("Press any key to close this help screen."),
+        Line::from("Press Esc/q/? to close this help screen.").style(DEFAULT_TEXT_STYLE),
     ]);
     let help_paragraph = Paragraph::new(help_text)
         .style(get_style(Styles::DefaultText, app.mode).remove_modifier(Modifier::DIM))

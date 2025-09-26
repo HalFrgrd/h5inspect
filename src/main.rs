@@ -27,6 +27,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .value_hint(clap::ValueHint::FilePath)
                 .required(true),
         )
+        .version(env!("CARGO_PKG_VERSION"))
         .get_matches();
 
     let h5_file_name: &String = matches.get_one("h5file").expect("h5file is required");
