@@ -112,23 +112,34 @@ fn render_object_info(frame: &mut Frame, app: &mut App, area: Rect) {
 
     let mut rows = vec![];
 
+    let key_col_width = 20;
+    let table_widths = [Constraint::Min(key_col_width), Constraint::Percentage(100)];
+    let data_col_width = std::cmp::max(area.width.saturating_sub(key_col_width + 3), 2); // 3 for borders
+
     let selected = app.tree_state.selected().to_vec();
     if !selected.is_empty() {
         // selected is of form: ["/group1", "/group1/dataset1"]
         let info = app.get_text_for(&selected);
         if let Some((info, hist_data_opt)) = info {
-            info.iter()
-                .for_each(|(k, v)| {
-                    v.split('\n')
-                        .enumerate()
-                        .for_each(|(i, subrow)| {
-                            let sub_row_k = if i == 0 { k } else { "" };
-                            rows.push(Row::new([
-                                Cell::from(Text::from(sub_row_k.to_owned())),
-                                Cell::from(Text::from(subrow.to_owned()).style(STYLE_MAGENTA)),
-                            ]));
-                        });
-                });
+            info.iter().for_each(|(k, v)| {
+                v.split('\n')
+                    .map(|line| {
+                        line.chars()
+                            .collect::<Vec<_>>()
+                            .chunks(data_col_width.into())
+                            .map(|chunk| chunk.iter().collect::<String>())
+                            .collect::<Vec<_>>()
+                    })
+                    .flatten()
+                    .enumerate()
+                    .for_each(|(i, subrow)| {
+                        let sub_row_k = if i == 0 { k } else { "" };
+                        rows.push(Row::new([
+                            Cell::from(Text::from(sub_row_k.to_owned())),
+                            Cell::from(Text::from(subrow.to_owned()).style(STYLE_MAGENTA)),
+                        ]));
+                    });
+            });
         }
     }
 
@@ -136,9 +147,7 @@ fn render_object_info(frame: &mut Frame, app: &mut App, area: Rect) {
     let max_scroll_state = num_lines_when_rendered.saturating_sub(area.height - 2);
     app.object_info_scroll_state = app.object_info_scroll_state.clamp(0, max_scroll_state);
 
-    let widths = [Constraint::Min(20), Constraint::Percentage(100)];
-
-    let table = Table::new(rows, widths);
+    let table = Table::new(rows, table_widths);
     let mut table_scroll = TableState::new().with_offset(app.object_info_scroll_state.into());
     frame.render_stateful_widget(table.block(object_info), area, &mut table_scroll);
 
