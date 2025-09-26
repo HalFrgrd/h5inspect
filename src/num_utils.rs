@@ -1,6 +1,6 @@
-use std::fmt::Display;
-
+use duplicate::duplicate_item;
 use num_traits::ToPrimitive;
+use std::fmt::Display;
 
 pub trait Summable: Sized {
     type AccumulatorType: std::ops::Add<Output = Self::AccumulatorType>
@@ -11,50 +11,42 @@ pub trait Summable: Sized {
         + ToPrimitive;
 }
 
-macro_rules! impl_summable_for_numbers {
-    ($($t:ty),*; $accum_type:ty) => {
-        $(
-            impl Summable for $t {
-                type AccumulatorType = $accum_type; // Now uses the provided AccumulatorType
-            }
-        )*
-    };
+#[duplicate_item(
+    num_type acc_type;
+    [ u8 ]  [u64];
+    [ u16 ] [u64];
+    [ u32 ] [u64];
+    [ u64 ] [u128];
+    [ i8 ]  [i64];
+    [ i16 ] [i64];
+    [ i32 ] [i64];
+    [ i64 ] [i128];
+    [ f32 ] [f64];
+    [ f64 ] [f64];
+)]
+impl Summable for num_type {
+    type AccumulatorType = acc_type;
 }
-
-// Implementing Summable for all signed integers, unsigned integers, and floating points
-impl_summable_for_numbers!(i8, i16, i32, i64; i64);
-impl_summable_for_numbers!(u8, u16, u32, u64; u64);
-impl_summable_for_numbers!(f32, f64; f64);
 
 pub trait IsNan {
     fn my_is_nan(&self) -> bool;
 }
 
-macro_rules! impl_isnan_for_floats {
-    ($($t:ty),*) => {
-        $(
-            impl IsNan for $t {
-                fn my_is_nan(&self) -> bool {
-                    self.is_nan()
-                }
-            }
-        )*
-    };
+#[duplicate_item(
+    num_type is_nan_impl;
+    [u8] [false];
+    [u16] [false];
+    [u32] [false];
+    [u64] [false];
+    [i8] [false];
+    [i16] [false];
+    [i32] [false];
+    [i64] [false];
+    [f32] [self.is_nan()];
+    [f64] [self.is_nan()];
+)]
+impl IsNan for num_type {
+    fn my_is_nan(&self) -> bool {
+        is_nan_impl
+    }
 }
-
-impl_isnan_for_floats!(f32, f64);
-
-macro_rules! impl_isnan_for_ints {
-
-    ($($t:ty),*) => {
-        $(
-            impl IsNan for $t {
-                fn my_is_nan(&self) -> bool {
-                    false
-                }
-            }
-        )*
-    };
-}
-
-impl_isnan_for_ints!(i8, i16, i32, i64, u8, u16, u32, u64);
