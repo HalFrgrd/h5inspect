@@ -32,16 +32,24 @@ enum Styles {
     Magenta,
     BorderHighlight,
     BorderDefault,
+    LogBorder,
 }
 
-fn get_style(style: Styles) -> Style {
-    match style {
+fn get_style(style: Styles, mode: SelectionMode) -> Style {
+    let s = match style {
         Styles::TreeItemHighlight => Style::new().bg(Color::DarkGray),
         Styles::DefaultText => Style::new().fg(Color::White),
         Styles::SearchCharMatch => Style::new().fg(Color::Red).add_modifier(Modifier::BOLD),
         Styles::Magenta => Style::new().fg(Color::Rgb(MAGENTA_R, MAGENTA_G, MAGENTA_B)),
         Styles::BorderHighlight => Style::default().fg(Color::Red),
         Styles::BorderDefault => Style::default().fg(Color::White),
+        Styles::LogBorder => Style::default().fg(Color::Blue),
+    };
+
+    if let SelectionMode::HelpScreen = mode {
+        s.add_modifier(Modifier::DIM)
+    } else {
+        s
     }
 }
 
@@ -65,12 +73,12 @@ pub fn ui(frame: &mut Frame, app: &mut App) {
     };
 
     if app.show_logs {
-        render_logger(frame, right_layout[1]);
+        render_logger(frame, app, right_layout[1]);
     }
     render_object_info(frame, app, object_info_area);
 
     if let SelectionMode::HelpScreen = app.mode {
-        render_help_screen(frame, popup_area(frame.area(), 80, 80));
+        render_help_screen(frame, app, popup_area(frame.area(), 80, 80));
     }
     app.set_last_object_info_area(object_info_area);
     app.set_last_tree_area(left_layout[0]);
@@ -80,11 +88,11 @@ impl<IdT> tree::TreeNode<IdT>
 where
     IdT: Eq + std::hash::Hash + Clone + std::fmt::Debug,
 {
-    pub fn into_tree_item(&self) -> WidgetTreeItem<'_, IdT> {
+    pub fn into_tree_item(&self, mode: SelectionMode) -> WidgetTreeItem<'_, IdT> {
         let children: Vec<_> = self
             .children()
             .iter()
-            .map(|child| child.into_tree_item())
+            .map(|child| child.into_tree_item(mode))
             .collect();
 
         let matching_indices = self.matching_indices();
@@ -94,7 +102,7 @@ where
                 .enumerate()
                 .map(|(i, c)| {
                     if matching_indices.contains(&i) {
-                        Span::styled(c.to_string(), get_style(Styles::SearchCharMatch))
+                        Span::styled(c.to_string(), get_style(Styles::SearchCharMatch, mode))
                     } else {
                         Span::raw(c.to_string())
                     }
@@ -106,7 +114,7 @@ where
         if num_children > 0 {
             formatted_text.push_span(Span::styled(
                 format!(" ({})", num_children),
-                get_style(Styles::Magenta),
+                get_style(Styles::Magenta, mode),
             ));
         }
 
@@ -123,14 +131,14 @@ fn render_object_info(frame: &mut Frame, app: &mut App, area: Rect) {
         .title_bottom(
             Line::from(format!("# background analysis tasks: {}", num_active_tasks))
                 .left_aligned()
-                .style(get_style(Styles::DefaultText).add_modifier(Modifier::DIM)),
+                .style(get_style(Styles::DefaultText, app.mode).add_modifier(Modifier::DIM)),
         )
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
         .border_style(if let SelectionMode::ObjectInfoInspecting = app.mode {
-            get_style(Styles::BorderHighlight)
+            get_style(Styles::BorderHighlight, app.mode)
         } else {
-            get_style(Styles::BorderDefault)
+            get_style(Styles::BorderDefault, app.mode)
         });
 
     frame.render_widget(&object_info, area);
@@ -170,7 +178,8 @@ fn render_object_info(frame: &mut Frame, app: &mut App, area: Rect) {
                         rows.push(Row::new([
                             Cell::from(Text::from(sub_row_k.to_owned())),
                             Cell::from(
-                                Text::from(subrow.to_owned()).style(get_style(Styles::Magenta)),
+                                Text::from(subrow.to_owned())
+                                    .style(get_style(Styles::Magenta, app.mode)),
                             ),
                         ]));
                     });
@@ -212,10 +221,10 @@ fn render_search(frame: &mut Frame, app: &mut App, area: Rect) {
         .title("Fuzzy search (type '/')")
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
-        .border_style(if let SelectionMode::ObjectInfoInspecting = app.mode {
-            get_style(Styles::BorderHighlight)
+        .border_style(if let SelectionMode::SearchQueryEditing = app.mode {
+            get_style(Styles::BorderHighlight, app.mode)
         } else {
-            get_style(Styles::BorderDefault)
+            get_style(Styles::BorderDefault, app.mode)
         });
 
     let (search_query_text, mut search_query_cursor_pos) = app.search_query_and_cursor();
@@ -257,20 +266,20 @@ fn render_tree(frame: &mut Frame, app: &mut App, area: Rect) {
         )
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
-        .border_style(if let SelectionMode::ObjectInfoInspecting = app.mode {
-            get_style(Styles::BorderHighlight)
+        .border_style(if let SelectionMode::TreeBrowsing = app.mode {
+            get_style(Styles::BorderHighlight, app.mode)
         } else {
-            get_style(Styles::BorderDefault)
+            get_style(Styles::BorderDefault, app.mode)
         });
 
     match &app.tree {
         Some(_) => match &app.filtered_tree {
             Some(filtered_tree) => {
-                let filtered_items = [filtered_tree.into_tree_item()];
+                let filtered_items = [filtered_tree.into_tree_item(app.mode)];
                 let tree_widget = WidgetTreeRoot::new(&filtered_items)
                     .expect("all item identifiers are unique")
-                    .style(get_style(Styles::DefaultText))
-                    .highlight_style(get_style(Styles::TreeItemHighlight))
+                    .style(get_style(Styles::DefaultText, app.mode))
+                    .highlight_style(get_style(Styles::TreeItemHighlight, app.mode))
                     .block(tree_block)
                     .experimental_scrollbar(Some(
                         Scrollbar::new(ScrollbarOrientation::VerticalRight)
@@ -302,14 +311,14 @@ fn render_tree(frame: &mut Frame, app: &mut App, area: Rect) {
     }
 }
 
-fn render_logger(frame: &mut Frame, area: Rect) {
+fn render_logger(frame: &mut Frame, app: &App, area: Rect) {
     let logger_widget = tui_logger::TuiLoggerWidget::default()
         .block(
             Block::bordered()
                 .title("Logs (toggle with 'L')")
                 .borders(Borders::ALL)
                 .border_type(BorderType::Rounded)
-                .border_style(Style::default().fg(Color::Blue)),
+                .border_style(get_style(Styles::LogBorder, app.mode)),
         )
         .output_separator('|')
         .output_timestamp(Some("%F %H:%M:%S%.3f".to_string()))
@@ -329,7 +338,7 @@ fn popup_area(area: Rect, percent_x: u16, percent_y: u16) -> Rect {
     area
 }
 
-fn render_help_screen(frame: &mut Frame, area: Rect) {
+fn render_help_screen(frame: &mut Frame, app: &App, area: Rect) {
     let help_block = Block::new()
         .title("Help")
         .borders(Borders::ALL)
@@ -374,7 +383,7 @@ fn render_help_screen(frame: &mut Frame, area: Rect) {
         Line::from("Press any key to close this help screen."),
     ]);
     let help_paragraph = Paragraph::new(help_text)
-        .style(get_style(Styles::DefaultText))
+        .style(get_style(Styles::DefaultText, app.mode).remove_modifier(Modifier::DIM))
         .alignment(ratatui::layout::Alignment::Left)
         .wrap(ratatui::widgets::Wrap { trim: true });
     frame.render_widget(help_paragraph, text_area);

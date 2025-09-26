@@ -1,11 +1,8 @@
+use crate::ui;
 use plotters::coord;
 use plotters::prelude::DrawingArea;
 use plotters::prelude::*;
-use plotters::prelude::{ChartBuilder, LabelAreaPosition, SeriesLabelPosition};
-use plotters::series::LineSeries;
-use plotters::style::Color as PlottersColor;
-// use plotters::style::{IntoTextStyle as _, RGBColor};
-use crate::ui;
+use plotters::prelude::{ChartBuilder, LabelAreaPosition};
 use plotters_ratatui_backend::{
     widget_fn, AreaResult, Draw, Error, PlottersWidget, RatatuiBackend,
 };

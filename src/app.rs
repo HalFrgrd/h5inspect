@@ -7,13 +7,13 @@ use crate::ui::ui;
 use crossterm::event::{MouseButton, MouseEventKind};
 use hdf5_metno as hdf5;
 
+use dirs;
 use ratatui::crossterm::event::{KeyCode, KeyModifiers};
 use ratatui::layout::{Position, Rect};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::vec;
-
 use tokio;
 
 #[allow(unused_imports)]
@@ -59,6 +59,7 @@ pub struct App {
     node_id_to_analysis: Arc<Mutex<HashMap<NodeIdT, AsyncDataAnalysis>>>,
 }
 
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub enum SelectionMode {
     TreeBrowsing,
     SearchQueryEditing,
@@ -68,6 +69,20 @@ pub enum SelectionMode {
 
 impl App {
     pub fn new(h5_file_path: PathBuf) -> App {
+        let mut starting_mode = SelectionMode::HelpScreen;
+
+        if let Some(config_dir) = dirs::config_local_dir() {
+            let app_config_dir = config_dir.join("h5inspect");
+            if app_config_dir.exists() {
+                starting_mode = SelectionMode::TreeBrowsing;
+            } else {
+                // create the config dir to mark that the user has run the app at least once
+                if let Err(e) = std::fs::create_dir(&app_config_dir) {
+                    error!("Failed to create config dir {:?}: {}", app_config_dir, e);
+                }
+            }
+        }
+
         App {
             running: true,
             h5_file_path,
@@ -78,7 +93,7 @@ impl App {
             search_query_left: String::new(),
             search_query_right: String::new(),
             search_query_view_offset: 0,
-            mode: SelectionMode::HelpScreen,
+            mode: starting_mode,
             show_logs: cfg!(debug_assertions),
             object_info_scroll_state: 0,
             last_object_info_area: Rect::new(0, 0, 0, 0),

@@ -798,6 +798,7 @@ dependencies = [
  "clap",
  "color-eyre",
  "crossterm",
+ "dirs",
  "dtoa",
  "duplicate",
  "futures",
