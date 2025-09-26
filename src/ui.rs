@@ -14,6 +14,16 @@ use ratatui::{
     Frame,
 };
 
+
+use plotters::prelude::{ChartBuilder, LabelAreaPosition, SeriesLabelPosition};
+use plotters::series::LineSeries;
+use plotters::style::{IntoTextStyle as _, RGBColor};
+use plotters::coord;
+use plotters::prelude::DrawingArea;
+use plotters_ratatui_backend::{widget_fn, AreaResult, RatatuiBackend};
+use plotters::prelude::*;
+use plotters::style::Color as PlottersColor;
+
 use tui_logger;
 use tui_tree_widget::Tree as WidgetTreeRoot;
 use tui_tree_widget::TreeItem as WidgetTreeItem;
@@ -108,7 +118,12 @@ fn render_object_info(frame: &mut Frame, app: &mut App, area: Rect) {
             }),
         );
 
-    // frame.render_widget(object_info, area);
+    frame.render_widget(&object_info, area);
+
+    let layout = Layout::vertical([Constraint::Percentage(50), Constraint::Percentage(50)]).split(area.inner(Margin::new(1, 1)));
+    let table_area = layout[0];
+    let chart_area = layout[1];
+
 
     let mut rows = vec![];
 
@@ -116,11 +131,14 @@ fn render_object_info(frame: &mut Frame, app: &mut App, area: Rect) {
     let table_widths = [Constraint::Min(key_col_width), Constraint::Percentage(100)];
     let data_col_width = std::cmp::max(area.width.saturating_sub(key_col_width + 3), 2); // 3 for borders
 
+    let mut histogram_data: Option<_> = None;
+
     let selected = app.tree_state.selected().to_vec();
     if !selected.is_empty() {
         // selected is of form: ["/group1", "/group1/dataset1"]
         let info = app.get_text_for(&selected);
         if let Some((info, hist_data_opt)) = info {
+            histogram_data = hist_data_opt;
             info.iter().for_each(|(k, v)| {
                 v.split('\n')
                     .map(|line| {
@@ -144,16 +162,16 @@ fn render_object_info(frame: &mut Frame, app: &mut App, area: Rect) {
     }
 
     let num_lines_when_rendered: u16 = rows.len().try_into().unwrap();
-    let max_scroll_state = num_lines_when_rendered.saturating_sub(area.height - 2);
+    let max_scroll_state = num_lines_when_rendered.saturating_sub(table_area.height - 2);
     app.object_info_scroll_state = app.object_info_scroll_state.clamp(0, max_scroll_state);
 
     let table = Table::new(rows, table_widths);
     let mut table_scroll = TableState::new().with_offset(app.object_info_scroll_state.into());
-    frame.render_stateful_widget(table.block(object_info), area, &mut table_scroll);
+    frame.render_stateful_widget(table, table_area, &mut table_scroll);
 
     let mut scrollbar_state = ScrollbarState::default()
         .content_length(max_scroll_state.into())
-        .viewport_content_length((area.height).into())
+        .viewport_content_length((table_area.height).into())
         .position(app.object_info_scroll_state.into());
 
     frame.render_stateful_widget(
@@ -161,9 +179,43 @@ fn render_object_info(frame: &mut Frame, app: &mut App, area: Rect) {
             .begin_symbol(None)
             .track_symbol(None)
             .end_symbol(None),
-        area.inner(Margin::new(0, 1)),
+            table_area.inner(Margin::new(0, 1)),
         &mut scrollbar_state,
     );
+
+
+    // log::debug!("Rendering chart in area: {:?}", histogram_data);
+
+    fn draw_fn(area: DrawingArea<RatatuiBackend, coord::Shift>) -> AreaResult{
+        let mut chart = ChartBuilder::on(&area)
+        .x_label_area_size(35)
+        .y_label_area_size(40)
+        .margin(5)
+        .caption("Histogram Test", ("sans-serif", 50.0))
+        .build_cartesian_2d((0u32..10u32).into_segmented(), 0u32..10u32)?;
+
+        chart
+            .configure_mesh()
+            .disable_x_mesh()
+            .bold_line_style(WHITE)
+            .y_desc("Count")
+            .x_desc("Bucket")
+            .axis_desc_style(("sans-serif", 15))
+            .draw()?;
+
+        let data = [
+            0u32, 1, 1, 1, 4, 2, 5, 7, 8, 6, 4, 2, 1, 8, 3, 3, 3, 4, 4, 3, 3, 3,
+        ];
+
+        chart.draw_series(
+            Histogram::vertical(&chart)
+                .style(RED.filled())
+                .data(data.iter().map(|x: &u32| (*x, 1))),
+        )?;
+        area.present()
+    }
+
+    frame.render_widget(widget_fn(draw_fn), chart_area);
 }
 
 fn render_search(frame: &mut Frame, app: &mut App, area: Rect) {
