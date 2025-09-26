@@ -363,6 +363,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "dtoa"
+version = "1.0.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d6add3b8cff394282be81f3fc1a0605db594ed69890078ca6e2cab1c408bcf04"
+
+[[package]]
 name = "duplicate"
 version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -560,6 +566,7 @@ dependencies = [
  "clap",
  "color-eyre",
  "crossterm",
+ "dtoa",
  "duplicate",
  "futures",
  "fuzzy-matcher",

@@ -1,5 +1,6 @@
 use crate::num_utils::{IsNan, MyToPrimitive, Summable};
 use core::f64;
+use dtoa;
 #[allow(unused_imports)]
 use hdf5::{File, H5Type};
 use hdf5_metno::{self as hdf5, Dataset};
@@ -67,12 +68,11 @@ where
         acc + x.to_owned().into()
     });
 
+    let mean: f64 = (sum.to_f64().unwrap_or(f64::NAN)) / (v.len() as f64);
+
     info.push((
         "Mean".to_owned(),
-        format!(
-            "{:.5}",
-            (sum.to_f64().unwrap_or(f64::NAN)) / (v.len() as f64)
-        ),
+        dtoa::Buffer::new().format(mean).to_string(),
     ));
 
     info.push((
@@ -81,7 +81,11 @@ where
     ));
 
     let arr_f64: Array1<f64> = v.mapv(|x| x.my_to_f64().unwrap_or(f64::NAN));
-    info.push(("Std".to_owned(), format!("{:.5}", arr_f64.std(1.))));
+    let std: f64 = arr_f64.std(1.);
+    info.push((
+        "Std".to_owned(),
+        dtoa::Buffer::new().format(std).to_string(),
+    ));
 
     let hist = compute_histogram(&arr_f64)?;
 

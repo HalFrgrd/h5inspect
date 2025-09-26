@@ -368,9 +368,31 @@ pub fn generate_dummy_file() -> Result<()> {
     let group1_d1 = group1
         .new_dataset::<bool>()
         .shape((10,))
-        .create("something")?;
+        .create("bool_ds")?;
     group1_d1.write(&vec![
         true, false, true, true, false, true, true, false, true, false,
+    ])?;
+
+    let group1_d1 = group1
+        .new_dataset::<i64>()
+        .shape((4,))
+        .create("large_num_ds")?;
+    group1_d1.write(&vec![
+        1029830192830923098i64,
+        9283928390909203,
+        187309128309182309,
+        2832098095820958,
+    ])?;
+
+    let group1_d1 = group1
+        .new_dataset::<f64>()
+        .shape((4,))
+        .create("small_num_ds")?;
+    group1_d1.write(&vec![
+        0.00000000001283798723,
+        0.0000000000000023092839,
+        0.00000000000083092839,
+        0.0000000000000023092839,
     ])?;
 
     // Create a dataset with variable-length strings
