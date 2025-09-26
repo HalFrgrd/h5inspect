@@ -5,7 +5,6 @@ use humansize::{format_size, DECIMAL};
 use ndarray::arr2;
 use ndarray::Array1;
 use ndarray::Array2;
-use num_format::{Locale, ToFormattedString};
 use rand::distr::{Bernoulli, Distribution};
 use rand::rngs::StdRng;
 use rand::SeedableRng;
@@ -128,9 +127,7 @@ pub fn get_text_for_dataset(dataset: &hdf5::Dataset) -> Vec<(String, String)> {
         format!(
             "{} ({} B)",
             format_size(storage_size, DECIMAL),
-            storage_size
-                .to_formatted_string(&Locale::en)
-                .replace(",", "_")
+            format_integer_with_underscore(storage_size)
         ),
     ));
     res.push((
@@ -138,7 +135,7 @@ pub fn get_text_for_dataset(dataset: &hdf5::Dataset) -> Vec<(String, String)> {
         format!(
             "{} ({} B)",
             format_size(data_size, DECIMAL),
-            data_size.to_formatted_string(&Locale::en).replace(",", "_")
+            format_integer_with_underscore(data_size.try_into().unwrap_or(0))
         ),
     ));
     res.push((
@@ -147,6 +144,21 @@ pub fn get_text_for_dataset(dataset: &hdf5::Dataset) -> Vec<(String, String)> {
     ));
     res.push(("Datatype".to_string(), datatype));
     res
+}
+
+fn format_integer_with_underscore(num: u64) -> String {
+    let num_str = num.to_string();
+    let mut formatted = String::new();
+    let len = num_str.len();
+
+    for (i, c) in num_str.chars().enumerate() {
+        if i > 0 && (len - i) % 3 == 0 {
+            formatted.push('_');
+        }
+        formatted.push(c);
+    }
+
+    formatted
 }
 
 pub fn get_text_for_group(group: &hdf5::Group, storage_size: u64) -> Vec<(String, String)> {
@@ -169,9 +181,7 @@ pub fn get_text_for_group(group: &hdf5::Group, storage_size: u64) -> Vec<(String
         format!(
             "{} ({} B)",
             format_size(storage_size, DECIMAL),
-            storage_size
-                .to_formatted_string(&Locale::en)
-                .replace(",", "_")
+            format_integer_with_underscore(storage_size)
         ),
     ));
     res
