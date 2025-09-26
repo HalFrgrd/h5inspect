@@ -33,6 +33,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     let h5_file_path = std::path::PathBuf::from(h5_file_name);
     tui_logger::init_logger(log::LevelFilter::Trace)?;
     tui_logger::set_default_level(log::LevelFilter::Trace);
+    tui_logger::set_level_for_target("plotters_ratatui_backend::widget", log::LevelFilter::Off);
+    tui_logger::set_level_for_target("mio::poll", log::LevelFilter::Off);
     log::info!("Starting app");
 
     let app = App::new(h5_file_path);

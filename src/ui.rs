@@ -23,7 +23,12 @@ use tui_tree_widget::TreeItem as WidgetTreeItem;
 const STYLE_HIGHLIGHT: Style = Style::new().bg(Color::DarkGray);
 const STYLE_DEFAULT_TEXT: Style = Style::new().fg(Color::White);
 const STYLE_MATCH: Style = Style::new().fg(Color::Red).add_modifier(Modifier::BOLD);
-const STYLE_MAGENTA: Style = Style::new().fg(Color::Magenta);
+
+pub const MAGENTA_R: u8 = 0xfc;
+pub const MAGENTA_G: u8 = 0x4c;
+pub const MAGENTA_B: u8 = 0xb4;
+
+const STYLE_MAGENTA: Style = Style::new().fg(Color::Rgb(MAGENTA_R, MAGENTA_G, MAGENTA_B));
 const COLOR_BORDER_HIGHLIGHT: Color = Color::Red;
 
 pub fn ui(frame: &mut Frame, app: &mut App) {
@@ -37,7 +42,7 @@ pub fn ui(frame: &mut Frame, app: &mut App) {
     render_tree(frame, app, left_layout[0]);
 
     let right_layout =
-        Layout::vertical([Constraint::Percentage(50), Constraint::Min(0)]).split(chunks[1]);
+        Layout::vertical([Constraint::Percentage(85), Constraint::Min(0)]).split(chunks[1]);
 
     let object_info_area = if app.show_logs {
         right_layout[0]
@@ -111,7 +116,7 @@ fn render_object_info(frame: &mut Frame, app: &mut App, area: Rect) {
 
     frame.render_widget(&object_info, area);
 
-    let layout = Layout::vertical([Constraint::Percentage(50), Constraint::Percentage(50)])
+    let layout = Layout::vertical([Constraint::Percentage(30), Constraint::Percentage(70)])
         .split(area.inner(Margin::new(1, 1)));
     let table_area = layout[0];
     let chart_area = layout[1];
@@ -153,7 +158,7 @@ fn render_object_info(frame: &mut Frame, app: &mut App, area: Rect) {
     }
 
     let num_lines_when_rendered: u16 = rows.len().try_into().unwrap();
-    let max_scroll_state = num_lines_when_rendered.saturating_sub(table_area.height - 2);
+    let max_scroll_state = num_lines_when_rendered.saturating_sub(table_area.height);
     app.object_info_scroll_state = app.object_info_scroll_state.clamp(0, max_scroll_state);
 
     let table = Table::new(rows, table_widths);
@@ -170,7 +175,7 @@ fn render_object_info(frame: &mut Frame, app: &mut App, area: Rect) {
             .begin_symbol(None)
             .track_symbol(None)
             .end_symbol(None),
-        area.inner(Margin::new(0, 1)),
+        table_area,
         &mut scrollbar_state,
     );
 
@@ -287,7 +292,7 @@ fn render_logger(frame: &mut Frame, area: Rect) {
                 .title("Logs (toggle with '?')")
                 .borders(Borders::ALL)
                 .border_type(BorderType::Rounded)
-                .border_style(Style::default().fg(Color::Green)),
+                .border_style(Style::default().fg(Color::Blue)),
         )
         .output_separator('|')
         .output_timestamp(Some("%F %H:%M:%S%.3f".to_string()))

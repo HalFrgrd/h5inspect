@@ -5,6 +5,7 @@ use plotters::prelude::{ChartBuilder, LabelAreaPosition, SeriesLabelPosition};
 use plotters::series::LineSeries;
 use plotters::style::Color as PlottersColor;
 // use plotters::style::{IntoTextStyle as _, RGBColor};
+use crate::ui;
 use plotters_ratatui_backend::{
     widget_fn, AreaResult, Draw, Error, PlottersWidget, RatatuiBackend,
 };
@@ -27,8 +28,6 @@ pub fn histogram_widget(
         1.0
     };
 
-    log::debug!("hist data: {:?}", hist_data.len());
-
     // let min_cnt = *counts.iter().min().unwrap();
     let max_cnt = *counts.iter().max().unwrap();
 
@@ -36,7 +35,7 @@ pub fn histogram_widget(
         let mut chart = ChartBuilder::on(&area)
             .margin(1)
             .set_label_area_size(LabelAreaPosition::Left, (5i32).percent_width())
-            .set_label_area_size(LabelAreaPosition::Bottom, (10i32).percent_height())
+            .set_label_area_size(LabelAreaPosition::Bottom, (5i32).percent_height())
             // .caption("Histogram Test", ("sans-serif", 50.0).into_font().color(&WHITE))
             .build_cartesian_2d(min_bin..(max_bin + bin_width), 0..max_cnt)?;
 
@@ -63,7 +62,11 @@ pub fn histogram_widget(
             let x0 = min_bin + i as f32 * bin_width;
             let x1 = x0 + bin_width;
 
-            let r = Rectangle::new([(x0, 0), (x1, count)], MAGENTA);
+            let mut r = Rectangle::new(
+                [(x0, 0), (x1, count)],
+                RGBColor(ui::MAGENTA_R, ui::MAGENTA_G, ui::MAGENTA_B),
+            );
+            r.set_margin(0, 0, 5, 5);
             chart.draw_series(std::iter::once(r))?;
         }
 
