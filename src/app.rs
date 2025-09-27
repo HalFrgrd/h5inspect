@@ -50,9 +50,10 @@ pub struct App {
     pub mode: SelectionMode,
     pub show_logs: bool,
     pub object_info_scroll_state: u16,
-    pub last_object_info_area: Rect,
-    pub last_tree_area: Rect,
-    pub last_search_query_area: Rect,
+    last_object_info_area: Rect,
+    last_tree_area: Rect,
+    last_search_query_area: Rect,
+    last_help_screen_area: Rect,
     pub animation_state: u8,
     node_id_to_analysis: Arc<Mutex<HashMap<NodeIdT, AsyncDataAnalysis>>>,
 }
@@ -99,6 +100,7 @@ impl App {
             last_object_info_area: Rect::new(0, 0, 0, 0),
             last_tree_area: Rect::new(0, 0, 0, 0),
             last_search_query_area: Rect::new(0, 0, 0, 0),
+            last_help_screen_area: Rect::new(0, 0, 0, 0),
             animation_state: 0,
             node_id_to_analysis: Arc::new(Mutex::new(HashMap::new())),
         }
@@ -235,6 +237,10 @@ impl App {
         let position = Position::new(column, row);
 
         log::debug!("clicked at {:?}", position);
+
+        if self.mode == SelectionMode::HelpScreen && self.last_help_screen_area.contains(position) {
+            return;
+        }
 
         if self.last_tree_area.contains(position) {
             self.mode = SelectionMode::TreeBrowsing;
@@ -502,6 +508,10 @@ impl App {
 
     pub fn set_last_search_query_area(&mut self, area: Rect) {
         self.last_search_query_area = area;
+    }
+
+    pub fn set_last_help_screen_area(&mut self, area: Rect) {
+        self.last_help_screen_area = area;
     }
 
     fn open_all_tree_nodes(&mut self) {

@@ -395,6 +395,24 @@ pub fn generate_dummy_file() -> Result<()> {
         0.0000000000000023092839,
     ])?;
 
+    let large_ds_len_1st_half = 1_000_000;
+    let large_ds_len_2nd_half = 200_000;
+    let large_ds = group1
+        .new_dataset::<i64>()
+        .shape((large_ds_len_1st_half + large_ds_len_2nd_half,))
+        .create("large_rand")?;
+    let range = 1_000_000_001..std::i64::MAX; // range for random integers greater than 1 billion
+    let random_numbers: Vec<i64> = (0..(large_ds_len_1st_half + large_ds_len_2nd_half))
+        .map(|x| {
+            if x < large_ds_len_1st_half {
+                rand::random_range(range.clone())
+            } else {
+                rand::random_range(0..99_999)
+            }
+        })
+        .collect();
+    large_ds.write(&random_numbers)?;
+
     // Create a dataset with variable-length strings
     let dataset: hdf5::Dataset = group1
         .new_dataset::<FixedUnicode<5>>()

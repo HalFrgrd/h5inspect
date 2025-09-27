@@ -31,8 +31,8 @@ pub fn histogram_widget(
     let draw_fn = move |area: DrawingArea<RatatuiBackend, coord::Shift>| -> AreaResult {
         let mut chart = ChartBuilder::on(&area)
             .margin(1)
-            .set_label_area_size(LabelAreaPosition::Left, (5i32).percent_width())
-            .set_label_area_size(LabelAreaPosition::Bottom, (5i32).percent_height())
+            .set_label_area_size(LabelAreaPosition::Left, 30)
+            .set_label_area_size(LabelAreaPosition::Bottom, 10)
             // .caption("Histogram Test", ("sans-serif", 50.0).into_font().color(&WHITE))
             .build_cartesian_2d(min_bin..(max_bin + bin_width), 0..max_cnt)?;
 
@@ -46,11 +46,11 @@ pub fn histogram_widget(
             .x_labels(2u16.max(widget_width / 10).into())
             .x_label_formatter(&|x| format!("{:e}", x))
             // .axis_desc_style(("sans-serif", 15).into_font().color(&WHITE))
-            // .axis_style(ShapeStyle {
-            //     color: WHITE.into(),
-            //     filled: true,
-            //     stroke_width: 0,
-            // })
+            .axis_style(ShapeStyle {
+                color: WHITE.into(),
+                filled: true,
+                stroke_width: 0,
+            })
             .label_style(("sans-serif", 15).into_font().color(&WHITE))
             .draw()?;
 

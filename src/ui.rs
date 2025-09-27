@@ -33,6 +33,7 @@ enum Styles {
     BorderHighlight,
     BorderDefault,
     LogBorder,
+    NoMatchesFound,
 }
 
 fn get_style(style: Styles, mode: SelectionMode) -> Style {
@@ -44,9 +45,14 @@ fn get_style(style: Styles, mode: SelectionMode) -> Style {
         Styles::BorderHighlight => Style::default().fg(Color::Red),
         Styles::BorderDefault => Style::default().fg(Color::White),
         Styles::LogBorder => Style::default().fg(Color::Blue),
+        Styles::NoMatchesFound => Style::default().bg(if mode == SelectionMode::HelpScreen {
+            Color::Rgb(0x9c, 0x33, 0x36)
+        } else {
+            Color::Red
+        }),
     };
 
-    if let SelectionMode::HelpScreen = mode {
+    if mode == SelectionMode::HelpScreen {
         s.add_modifier(Modifier::DIM)
     } else {
         s
@@ -77,12 +83,14 @@ pub fn ui(frame: &mut Frame, app: &mut App) {
     }
     render_object_info(frame, app, object_info_area);
 
-    if let SelectionMode::HelpScreen = app.mode {
-        render_help_screen(frame, app, popup_area(frame.area(), 80, 80));
+    let help_screen_area = get_help_screen_area(frame.area());
+    if app.mode == SelectionMode::HelpScreen {
+        render_help_screen(frame, app, help_screen_area);
     }
     app.set_last_object_info_area(object_info_area);
     app.set_last_tree_area(left_layout[0]);
     app.set_last_search_query_area(left_layout[1]);
+    app.set_last_help_screen_area(help_screen_area);
 }
 impl<IdT> tree::TreeNode<IdT>
 where
@@ -128,6 +136,11 @@ fn render_object_info(frame: &mut Frame, app: &mut App, area: Rect) {
 
     let object_info = Block::new()
         .title("Object info")
+        .title_top(
+            Line::from("Help screen ('?')")
+                .right_aligned()
+                .style(get_style(Styles::DefaultText, app.mode)),
+        )
         .title_bottom(
             Line::from(format!("# background analysis tasks: {}", num_active_tasks))
                 .left_aligned()
@@ -135,7 +148,7 @@ fn render_object_info(frame: &mut Frame, app: &mut App, area: Rect) {
         )
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
-        .border_style(if let SelectionMode::ObjectInfoInspecting = app.mode {
+        .border_style(if app.mode == SelectionMode::ObjectInfoInspecting {
             get_style(Styles::BorderHighlight, app.mode)
         } else {
             get_style(Styles::BorderDefault, app.mode)
@@ -221,10 +234,10 @@ fn render_object_info(frame: &mut Frame, app: &mut App, area: Rect) {
 
 fn render_search(frame: &mut Frame, app: &mut App, area: Rect) {
     let search_block = Block::new()
-        .title("Fuzzy search (type '/')")
+        .title("Fuzzy search ('/')")
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
-        .border_style(if let SelectionMode::SearchQueryEditing = app.mode {
+        .border_style(if app.mode == SelectionMode::SearchQueryEditing {
             get_style(Styles::BorderHighlight, app.mode)
         } else {
             get_style(Styles::BorderDefault, app.mode)
@@ -260,7 +273,7 @@ fn render_search(frame: &mut Frame, app: &mut App, area: Rect) {
 }
 
 fn render_tree(frame: &mut Frame, app: &mut App, area: Rect) {
-    let tree_block = Block::new()
+    let mut tree_block = Block::new()
         .title(
             app.h5_file_path
                 .to_str()
@@ -269,7 +282,7 @@ fn render_tree(frame: &mut Frame, app: &mut App, area: Rect) {
         )
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
-        .border_style(if let SelectionMode::TreeBrowsing = app.mode {
+        .border_style(if app.mode == SelectionMode::TreeBrowsing {
             get_style(Styles::BorderHighlight, app.mode)
         } else {
             get_style(Styles::BorderDefault, app.mode)
@@ -294,11 +307,12 @@ fn render_tree(frame: &mut Frame, app: &mut App, area: Rect) {
                 frame.render_stateful_widget(tree_widget, area, &mut app.tree_state);
             }
             None => {
+                tree_block = tree_block.border_style(get_style(Styles::BorderDefault, app.mode));
                 frame.render_widget(
                     Paragraph::new("No matches found")
                         .centered()
                         .block(tree_block)
-                        .style(Style::default().bg(Color::Red)),
+                        .style(get_style(Styles::NoMatchesFound, app.mode)),
                     area,
                 );
             }
@@ -326,22 +340,22 @@ fn render_logger(frame: &mut Frame, app: &App, area: Rect) {
         .output_separator('|')
         .output_timestamp(Some("%F %H:%M:%S%.3f".to_string()))
         .output_level(Some(tui_logger::TuiLoggerLevelOutput::Abbreviated))
+        .style(get_style(Styles::DefaultText, app.mode))
         .output_target(false)
         .output_file(false)
         .output_line(false);
     frame.render_widget(logger_widget, area);
 }
 
-/// helper function to create a centered rect using up certain percentage of the available rect `r`
-fn popup_area(area: Rect, percent_x: u16, percent_y: u16) -> Rect {
-    let vertical = Layout::vertical([Constraint::Percentage(percent_y)]).flex(Flex::Center);
-    let horizontal = Layout::horizontal([Constraint::Percentage(percent_x)]).flex(Flex::Center);
+fn get_help_screen_area(area: Rect) -> Rect {
+    let vertical = Layout::vertical([Constraint::Length(40)]).flex(Flex::Center);
+    let horizontal = Layout::horizontal([Constraint::Length(110)]).flex(Flex::Center);
     let [area] = vertical.areas(area);
     let [area] = horizontal.areas(area);
     area
 }
 
-fn render_help_screen(frame: &mut Frame, app: &App, area: Rect) {
+fn render_help_screen(frame: &mut Frame, _app: &App, area: Rect) {
     let help_block = Block::new()
         .title("Help")
         .borders(Borders::ALL)
@@ -351,9 +365,12 @@ fn render_help_screen(frame: &mut Frame, app: &App, area: Rect) {
     frame.render_widget(Clear, area);
     frame.render_widget(help_block, area);
 
-    let [title_area, text_area] =
-        Layout::vertical([Constraint::Min(20), Constraint::Percentage(100)])
-            .areas(area.inner(Margin::new(3, 3)));
+    let [_, title_area, text_area] = Layout::vertical([
+        Constraint::Length(3),
+        Constraint::Length(12),
+        Constraint::Percentage(100),
+    ])
+    .areas(area.inner(Margin::new(1, 0)));
 
     let [_, main_title_area, _] = Layout::horizontal([
         Constraint::Fill(1),
@@ -362,7 +379,7 @@ fn render_help_screen(frame: &mut Frame, app: &App, area: Rect) {
     ])
     .areas(title_area);
     let [main_title_area, version_area] =
-        Layout::vertical([Constraint::Length(8), Constraint::Length(10)]).areas(main_title_area);
+        Layout::vertical([Constraint::Length(9), Constraint::Fill(1)]).areas(main_title_area);
 
     let big_text = BigText::builder()
         .pixel_size(PixelSize::Full)
@@ -386,45 +403,78 @@ fn render_help_screen(frame: &mut Frame, app: &App, area: Rect) {
     frame.render_widget(big_text_version, version_area);
 
     const KEY_BINDING_TITLE_STYLE: Style =
-        Style::new().fg(Color::Cyan).add_modifier(Modifier::BOLD);
+        Style::new().fg(Color::White).add_modifier(Modifier::BOLD);
     const KEY_BINDING_STYLE: Style = Style::new().fg(Color::Yellow);
     const DEFAULT_TEXT_STYLE: Style = Style::new().fg(Color::White);
-    let help_text = Text::from(vec![
-        Line::from("h5inspect - Simple TUI to inspect h5 files"),
+
+    let table_widths = [Constraint::Length(24), Constraint::Length(30)];
+
+    let [table_area] = Layout::horizontal([Constraint::Length(54)])
+        .flex(Flex::Center)
+        .areas(text_area);
+    let [top_of_table_area, table_area, bottom_of_table_area] = Layout::vertical([
+        Constraint::Length(3),
+        Constraint::Length(10),
+        Constraint::Length(5),
+    ])
+    .flex(Flex::Center)
+    .areas(table_area);
+
+    let top_of_table_text = Paragraph::new(vec![
+        Line::from("Simple TUI to inspect h5 files."),
         Line::from(""),
-        Line::from("Key bindings:").style(KEY_BINDING_TITLE_STYLE),
-        Line::from("  Up/Down/Left/Right:").style(KEY_BINDING_STYLE),
-        Line::from("    Navigate tree").style(DEFAULT_TEXT_STYLE),
-        Line::from("  Enter:").style(KEY_BINDING_STYLE),
-        Line::from("    Expand/collapse group").style(DEFAULT_TEXT_STYLE),
-        Line::from("  /:").style(KEY_BINDING_STYLE),
-        Line::from("    Start editing search query").style(DEFAULT_TEXT_STYLE),
-        Line::from("  Esc:").style(KEY_BINDING_STYLE),
-        Line::from("    Stop editing search query").style(DEFAULT_TEXT_STYLE),
-        Line::from("  Backspace:").style(KEY_BINDING_STYLE),
-        Line::from("    Delete last character in search query").style(DEFAULT_TEXT_STYLE),
-        Line::from("  Ctrl+U:").style(KEY_BINDING_STYLE),
-        Line::from("    Clear search query").style(DEFAULT_TEXT_STYLE),
-        Line::from("  n:").style(KEY_BINDING_STYLE),
-        Line::from("    Jump to next match in tree").style(DEFAULT_TEXT_STYLE),
-        Line::from("  N:").style(KEY_BINDING_STYLE),
-        Line::from("    Jump to previous match in tree").style(DEFAULT_TEXT_STYLE),
-        Line::from("  i:").style(KEY_BINDING_STYLE),
-        Line::from("    Inspect object info (if any)").style(DEFAULT_TEXT_STYLE),
-        Line::from("  o:").style(KEY_BINDING_STYLE),
-        Line::from("    Stop inspecting object info").style(DEFAULT_TEXT_STYLE),
-        Line::from("  ?:").style(KEY_BINDING_STYLE),
-        Line::from("    Toggle this help screen").style(DEFAULT_TEXT_STYLE),
-        Line::from("  l:").style(KEY_BINDING_STYLE),
-        Line::from("    Toggle log view").style(DEFAULT_TEXT_STYLE),
-        Line::from("  q:").style(KEY_BINDING_STYLE),
-        Line::from("    Quit").style(DEFAULT_TEXT_STYLE),
-        Line::from(""),
-        Line::from("Press Esc/q/? to close this help screen.").style(DEFAULT_TEXT_STYLE),
+        Line::from("Key bindings")
+            .style(KEY_BINDING_TITLE_STYLE)
+            .centered(),
     ]);
-    let help_paragraph = Paragraph::new(help_text)
-        .style(get_style(Styles::DefaultText, app.mode).remove_modifier(Modifier::DIM))
-        .alignment(ratatui::layout::Alignment::Left)
-        .wrap(ratatui::widgets::Wrap { trim: true });
-    frame.render_widget(help_paragraph, text_area);
+    frame.render_widget(top_of_table_text, top_of_table_area);
+
+    let help_text = Table::new(
+        vec![
+            Row::new([
+                Cell::new(Span::from("Navigate").style(DEFAULT_TEXT_STYLE)),
+                Cell::new(
+                    Text::from("←,↑,→,↓,\nh,j,k,l,\nHome,End,PageUp,PageDown\nClick,Scroll")
+                        .style(KEY_BINDING_STYLE),
+                ),
+            ])
+            .height(4),
+            Row::new([
+                Cell::new(Span::from("Close/open group").style(DEFAULT_TEXT_STYLE)),
+                Cell::new(Span::from("Enter/c").style(KEY_BINDING_STYLE)),
+            ]),
+            Row::new([
+                Cell::new(Span::from("Go to top of tree").style(DEFAULT_TEXT_STYLE)),
+                Cell::new(Span::from("g").style(KEY_BINDING_STYLE)),
+            ]),
+            Row::new([
+                Cell::new(Span::from("Go to bottom of tree").style(DEFAULT_TEXT_STYLE)),
+                Cell::new(Span::from("G").style(KEY_BINDING_STYLE)),
+            ]),
+            Row::new([
+                Cell::new(Span::from("Fuzzy search").style(DEFAULT_TEXT_STYLE)),
+                Cell::new(Span::from("/").style(KEY_BINDING_STYLE)),
+            ]),
+            Row::new([
+                Cell::new(Span::from("Help screen").style(DEFAULT_TEXT_STYLE)),
+                Cell::new(Span::from("?").style(KEY_BINDING_STYLE)),
+            ]),
+            Row::new([
+                Cell::new(Span::from("Debug logs").style(DEFAULT_TEXT_STYLE)),
+                Cell::new(Span::from("L").style(KEY_BINDING_STYLE)),
+            ]),
+        ],
+        table_widths,
+    );
+    frame.render_widget(help_text, table_area);
+
+    let bottom_of_table_text = Paragraph::new(vec![
+        Line::from(""),
+        Line::from(vec![
+            Span::raw("Press "),
+            Span::raw("Esc/q/?").style(KEY_BINDING_STYLE),
+            Span::raw(" to close this help screen."),
+        ]),
+    ]);
+    frame.render_widget(bottom_of_table_text, bottom_of_table_area);
 }
