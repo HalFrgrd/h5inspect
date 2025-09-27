@@ -360,7 +360,7 @@ fn render_help_screen(frame: &mut Frame, _app: &App, area: Rect) {
         .title("Help")
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
-        .border_style(Style::default().fg(Color::Red));
+        .border_style(Style::default().fg(Color::Red).add_modifier(Modifier::BOLD));
 
     frame.render_widget(Clear, area);
     frame.render_widget(help_block, area);
@@ -414,14 +414,14 @@ fn render_help_screen(frame: &mut Frame, _app: &App, area: Rect) {
         .areas(text_area);
     let [top_of_table_area, table_area, bottom_of_table_area] = Layout::vertical([
         Constraint::Length(3),
-        Constraint::Length(10),
+        Constraint::Length(11),
         Constraint::Length(5),
     ])
     .flex(Flex::Center)
     .areas(table_area);
 
     let top_of_table_text = Paragraph::new(vec![
-        Line::from("Simple TUI to inspect h5 files."),
+        Line::from("Simple TUI to inspect hdf5 files."),
         Line::from(""),
         Line::from("Key bindings")
             .style(KEY_BINDING_TITLE_STYLE)
@@ -434,7 +434,7 @@ fn render_help_screen(frame: &mut Frame, _app: &App, area: Rect) {
             Row::new([
                 Cell::new(Span::from("Navigate").style(DEFAULT_TEXT_STYLE)),
                 Cell::new(
-                    Text::from("←,↑,→,↓,\nh,j,k,l,\nHome,End,PageUp,PageDown\nClick,Scroll")
+                    Text::from("←,↑,→,↓,\nh,j,k,l,\nHome,End,PageUp,PageDown\nclick,scroll")
                         .style(KEY_BINDING_STYLE),
                 ),
             ])
@@ -462,6 +462,10 @@ fn render_help_screen(frame: &mut Frame, _app: &App, area: Rect) {
             Row::new([
                 Cell::new(Span::from("Debug logs").style(DEFAULT_TEXT_STYLE)),
                 Cell::new(Span::from("L").style(KEY_BINDING_STYLE)),
+            ]),
+            Row::new([
+                Cell::new(Span::from("Quit").style(DEFAULT_TEXT_STYLE)),
+                Cell::new(Span::from("q/Ctrl+c").style(KEY_BINDING_STYLE)),
             ]),
         ],
         table_widths,
