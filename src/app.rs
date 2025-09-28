@@ -5,6 +5,11 @@ use crate::h5_utils;
 use crate::tree::TreeNode;
 use crate::ui::ui;
 use crossterm::event::{MouseButton, MouseEventKind};
+use crossterm::{
+    execute,
+    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+};
+use std::process::Command;
 use hdf5_metno as hdf5;
 
 use dirs;
@@ -557,6 +562,15 @@ impl App {
                     match event {
                         events::Event::AnimationTick => {
                             self.animation_state = self.animation_state.wrapping_add(1);
+                        }
+                        events::Event::Key(key) if key.code == KeyCode::Enter => {
+
+                            disable_raw_mode().unwrap();
+                            execute!(std::io::stdout(), LeaveAlternateScreen)?;
+                            Command::new("vim").arg("/tmp/a.txt").status()?;
+                            enable_raw_mode().unwrap();
+                            execute!(std::io::stdout(), EnterAlternateScreen)?;
+                            terminal.clear()?;
                         }
                         events::Event::Key(key) => self.handle_keypress(key),
                         events::Event::Mouse(mouse) => self.handle_mouse(mouse),

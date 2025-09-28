@@ -409,7 +409,7 @@ fn render_help_screen(frame: &mut Frame, _app: &App, area: Rect) {
 
     let table_widths = [Constraint::Length(24), Constraint::Length(30)];
 
-    let [table_area] = Layout::horizontal([Constraint::Length(54)])
+    let [table_area] = Layout::horizontal([Constraint::Length(49)])
         .flex(Flex::Center)
         .areas(text_area);
     let [top_of_table_area, table_area, bottom_of_table_area] = Layout::vertical([
