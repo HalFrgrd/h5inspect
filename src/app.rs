@@ -9,7 +9,7 @@ use hdf5_metno as hdf5;
 
 use dirs;
 use log;
-use ratatui::crossterm::event::{KeyCode, KeyModifiers};
+use crossterm::event::{KeyCode, KeyModifiers};
 use ratatui::layout::{Position, Rect};
 use std::collections::HashMap;
 use std::path::PathBuf;
