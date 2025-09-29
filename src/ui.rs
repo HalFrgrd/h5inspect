@@ -92,6 +92,7 @@ pub fn ui(frame: &mut Frame, app: &mut App) {
     app.set_last_search_query_area(left_layout[1]);
     app.set_last_help_screen_area(help_screen_area);
 }
+
 impl<IdT> tree::TreeNode<IdT>
 where
     IdT: Eq + std::hash::Hash + Clone + std::fmt::Debug,
@@ -163,7 +164,7 @@ fn render_object_info(frame: &mut Frame, app: &mut App, area: Rect) {
 
     let mut rows = vec![];
 
-    let key_col_width = 20;
+    let key_col_width = 26;
     let table_widths = [Constraint::Min(key_col_width), Constraint::Percentage(100)];
     let data_col_width = std::cmp::max(area.width.saturating_sub(key_col_width + 3), 2); // 3 for borders
 

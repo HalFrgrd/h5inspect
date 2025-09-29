@@ -1,7 +1,6 @@
 use hdf5::{File, H5Type, Result};
 use hdf5_metno as hdf5;
 use hdf5_metno::types::FixedUnicode;
-use humansize::{format_size, DECIMAL};
 use ndarray::arr2;
 use ndarray::Array1;
 use ndarray::Array2;
@@ -49,7 +48,7 @@ pub fn datasets(group: &hdf5::Group) -> hdf5::Result<Vec<(String, hdf5::Dataset)
     })
 }
 
-fn type_descriptor_to_text(dt: hdf5::types::TypeDescriptor) -> String {
+pub fn type_descriptor_to_text(dt: hdf5::types::TypeDescriptor) -> String {
     match dt {
         hdf5::types::TypeDescriptor::Compound(ct) => {
             let mut rep: String = "compound(\n  size: ".into();
@@ -85,106 +84,6 @@ fn type_descriptor_to_text(dt: hdf5::types::TypeDescriptor) -> String {
         }
         non_compound => format!("{}", non_compound),
     }
-}
-
-pub fn get_text_for_dataset(dataset: &hdf5::Dataset) -> Vec<(String, String)> {
-    let shape = dataset.shape();
-    // let datatype = dataset.dtyp;e().map(get_datatype_string).unwrap_or("unknown".to_string());
-    let datatype: String =
-        type_descriptor_to_text(dataset.dtype().unwrap().to_descriptor().unwrap());
-    let space = dataset
-        .space()
-        .map(|s| format!("{:?}", s))
-        .unwrap_or("unknown".to_string());
-    let chunks = dataset.chunk();
-    let chunk_info = match chunks {
-        Some(chunks) => format!("Chunked ({:?})", chunks),
-        None => "Contiguous".to_string(),
-    };
-
-    // Get compression info
-    let compression = dataset.filters();
-    let compression_info = format!("Filter pipeline: {:?}", compression);
-
-    // Get storage size vs data size
-    let storage_size = dataset.storage_size();
-    let data_size = dataset.size() * dataset.dtype().map_or(0, |dt| dt.size());
-    let compression_ratio = if storage_size > 0 {
-        data_size as f64 / storage_size as f64
-    } else {
-        f64::NAN
-    };
-
-    let mut res = vec![];
-
-    res.push(("Path".to_string(), dataset.name().to_string()));
-    res.push(("Shape".to_string(), format!("{:?}", shape)));
-    res.push(("Space".to_string(), space));
-    res.push(("Chunk info".to_string(), chunk_info));
-    res.push(("Compression".to_string(), compression_info));
-    res.push((
-        "Storage size".to_string(),
-        format!(
-            "{} ({} B)",
-            format_size(storage_size, DECIMAL),
-            format_integer_with_underscore(storage_size)
-        ),
-    ));
-    res.push((
-        "Data size".to_string(),
-        format!(
-            "{} ({} B)",
-            format_size(data_size, DECIMAL),
-            format_integer_with_underscore(data_size.try_into().unwrap_or(0))
-        ),
-    ));
-    res.push((
-        "Compression ratio".to_string(),
-        format!("{:.2}", compression_ratio),
-    ));
-    res.push(("Datatype".to_string(), datatype));
-    res
-}
-
-fn format_integer_with_underscore(num: u64) -> String {
-    let num_str = num.to_string();
-    let mut formatted = String::new();
-    let len = num_str.len();
-
-    for (i, c) in num_str.chars().enumerate() {
-        if i > 0 && (len - i) % 3 == 0 {
-            formatted.push('_');
-        }
-        formatted.push(c);
-    }
-
-    formatted
-}
-
-pub fn get_text_for_group(group: &hdf5::Group, storage_size: u64) -> Vec<(String, String)> {
-    let num_groups = group.groups().unwrap_or(vec![]).len();
-    let num_datasets = group.datasets().unwrap_or(vec![]).len();
-    let attrs = group.attr_names().unwrap_or(vec![]);
-    let num_attrs = attrs.len();
-
-    let mut res = vec![];
-    res.push(("Path".to_string(), group.name().to_string()));
-    res.push(("Number of groups".to_string(), format!("{}", num_groups)));
-    res.push((
-        "Number of datasets".to_string(),
-        format!("{}", num_datasets),
-    ));
-    res.push(("Number of attributes".to_string(), format!("{}", num_attrs)));
-    res.push(("Attribute names".to_string(), format!("{:?}", attrs)));
-    res.push((
-        "Storage size".to_string(),
-        format!(
-            "{} ({} B)",
-            format_size(storage_size, DECIMAL),
-            format_integer_with_underscore(storage_size)
-        ),
-    ));
-    res
 }
 
 #[derive(H5Type, Clone, PartialEq, Debug)] // register with HDF5

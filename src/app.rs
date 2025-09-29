@@ -7,9 +7,10 @@ use crate::ui::ui;
 use crossterm::event::{MouseButton, MouseEventKind};
 use hdf5_metno as hdf5;
 
-use dirs;
-use log;
 use crossterm::event::{KeyCode, KeyModifiers};
+use dirs;
+use humansize::{format_size, DECIMAL};
+use log;
 use ratatui::layout::{Position, Rect};
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -64,6 +65,133 @@ pub enum SelectionMode {
     SearchQueryEditing,
     ObjectInfoInspecting,
     HelpScreen,
+}
+
+fn format_integer_with_underscore(num: u64) -> String {
+    let num_str = num.to_string();
+    let mut formatted = String::new();
+    let len = num_str.len();
+
+    for (i, c) in num_str.chars().enumerate() {
+        if i > 0 && (len - i) % 3 == 0 {
+            formatted.push('_');
+        }
+        formatted.push(c);
+    }
+
+    formatted
+}
+
+fn get_text_for_dataset(tree_node: &TreeNode<NodeIdT>) -> Vec<(String, String)> {
+    let Hdf5Object::Dataset(dataset) = &tree_node
+        .hdf5_object
+        .as_ref()
+        .expect("No hdf5 object found in tree_node")
+    else {
+        panic!("Expected a Dataset, found a Group or None");
+    };
+
+    let shape = dataset.shape();
+    // let datatype = dataset.dtyp;e().map(get_datatype_string).unwrap_or("unknown".to_string());
+    let datatype: String =
+        h5_utils::type_descriptor_to_text(dataset.dtype().unwrap().to_descriptor().unwrap());
+    let space = dataset
+        .space()
+        .map(|s| format!("{:?}", s))
+        .unwrap_or("unknown".to_string());
+    let chunks = dataset.chunk();
+    let chunk_info = match chunks {
+        Some(chunks) => format!("Chunked ({:?})", chunks),
+        None => "Contiguous".to_string(),
+    };
+
+    // Get compression info
+    let compression = dataset.filters();
+    let compression_info = format!("Filter pipeline: {:?}", compression);
+
+    // Get storage size vs data size
+    let storage_size = dataset.storage_size();
+    let data_size = dataset.size() * dataset.dtype().map_or(0, |dt| dt.size());
+    let compression_ratio = if storage_size > 0 {
+        data_size as f64 / storage_size as f64
+    } else {
+        f64::NAN
+    };
+
+    let mut res = vec![];
+
+    res.push(("Path".to_string(), dataset.name().to_string()));
+    res.push(("Shape".to_string(), format!("{:?}", shape)));
+    res.push(("Space".to_string(), space));
+    res.push(("Chunk info".to_string(), chunk_info));
+    res.push(("Compression".to_string(), compression_info));
+    res.push((
+        "Storage size".to_string(),
+        format!(
+            "{} ({} B)",
+            format_size(storage_size, DECIMAL),
+            format_integer_with_underscore(storage_size)
+        ),
+    ));
+    res.push((
+        "Data size".to_string(),
+        format!(
+            "{} ({} B)",
+            format_size(data_size, DECIMAL),
+            format_integer_with_underscore(data_size.try_into().unwrap_or(0))
+        ),
+    ));
+    res.push((
+        "Compression ratio".to_string(),
+        format!("{:.2}", compression_ratio),
+    ));
+    res.push(("Datatype".to_string(), datatype));
+    res
+}
+
+fn get_text_for_group(tree_node: &TreeNode<NodeIdT>) -> Vec<(String, String)> {
+    let Hdf5Object::Group(group) = &tree_node
+        .hdf5_object
+        .as_ref()
+        .expect("No hdf5 object found in tree_node")
+    else {
+        panic!("Expected a Dataset, found a Group or None");
+    };
+
+    let num_groups = group.groups().unwrap_or(vec![]).len();
+    let num_datasets = group.datasets().unwrap_or(vec![]).len();
+    let attrs = group.attr_names().unwrap_or(vec![]);
+    let num_attrs = attrs.len();
+
+    let mut res = vec![];
+    res.push(("Path".to_string(), group.name().to_string()));
+    res.push((
+        "Number of direct groups".to_string(),
+        num_groups.to_string(),
+    ));
+    res.push((
+        "Number of total groups".to_string(),
+        format!("{}", tree_node.recursive_num_groups),
+    ));
+    res.push((
+        "Number of direct datasets".to_string(),
+        num_datasets.to_string(),
+    ));
+    res.push((
+        "Number of total datasets".to_string(),
+        tree_node.recursive_num_datasets.to_string(),
+    ));
+    res.push(("Number of attributes".to_string(), num_attrs.to_string()));
+    res.push(("Attribute names".to_string(), format!("{:?}", attrs)));
+    res.push((
+        "Storage size".to_string(),
+        format!(
+            "{} ({} B)",
+            format_size(tree_node.recursive_storage_data_size, DECIMAL),
+            format_integer_with_underscore(tree_node.recursive_storage_data_size)
+        ),
+    ));
+    res
 }
 
 impl App {
@@ -157,7 +285,7 @@ impl App {
             match tree.get_selected_node(path) {
                 Some(ref tree_node) => match &tree_node.hdf5_object {
                     Some(Hdf5Object::Dataset(dataset)) => {
-                        let mut info = h5_utils::get_text_for_dataset(&dataset);
+                        let mut info = get_text_for_dataset(&tree_node);
 
                         let k = tree_node.id().clone();
 
@@ -213,10 +341,7 @@ impl App {
 
                         Some((info, hist_data))
                     }
-                    Some(Hdf5Object::Group(group)) => {
-                        let size = tree_node.recursive_storage_data_size;
-                        Some((h5_utils::get_text_for_group(&group, size), None))
-                    }
+                    Some(Hdf5Object::Group(_)) => Some((get_text_for_group(&tree_node), None)),
                     None => {
                         log::debug!("No hdf5 object found at path {:?}", path);
                         None

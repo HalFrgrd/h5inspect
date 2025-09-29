@@ -13,6 +13,8 @@ where
     text: String,
     children: Vec<TreeNode<IdT>>,
     recursive_num_children: usize,
+    pub recursive_num_datasets: usize,
+    pub recursive_num_groups: usize,
     pub recursive_storage_data_size: u64,
     matching_indices: Vec<usize>,
     pub is_direct_match: bool,
@@ -40,6 +42,24 @@ where
             .sum::<usize>()
             + children.len();
 
+        let recursive_num_datasets: usize = children
+            .iter()
+            .map(|child| child.recursive_num_datasets)
+            .sum::<usize>()
+            + children
+                .iter()
+                .filter(|c| matches!(c.hdf5_object, Some(Hdf5Object::Dataset(_))))
+                .count();
+
+        let recursive_num_groups: usize = children
+            .iter()
+            .map(|child| child.recursive_num_groups)
+            .sum::<usize>()
+            + children
+                .iter()
+                .filter(|c| matches!(c.hdf5_object, Some(Hdf5Object::Group(_))))
+                .count();
+
         let recursive_storage_data_size: u64 = children
             .iter()
             .map(|child| child.recursive_storage_data_size)
@@ -50,6 +70,8 @@ where
             text: text.into(),
             children,
             recursive_num_children,
+            recursive_num_datasets,
+            recursive_num_groups,
             recursive_storage_data_size,
             matching_indices: indices,
             is_direct_match,
