@@ -92,12 +92,42 @@ where
     Ok(AnalysisResult::Stats(info, hist))
 }
 
+// fn analysis_unicode(d: Arc<Dataset>) -> Result<AnalysisResult, Box<dyn Error>> {
+//     // Try to read as Vec<String> (assuming dataset is 1D and contains unicode strings)
+//     let v: Array1<hdf5::types::FixedUnicode<5>> = d.read_1d()?;
+//     let formatted = format!("{}", v);
+//      Ok(AnalysisResult::Stats(vec![("Data".to_owned(), formatted)], None))
+
+// }
+
 pub fn hdf5_dataset_analysis(d: Arc<Dataset>) -> Result<AnalysisResult, Box<dyn Error>> {
+    let dtype = d.dtype()?;
+
+    if d.is_scalar() && dtype.is::<hdf5::types::FixedUnicode<5>>() {
+        match d.read_scalar::<hdf5::types::FixedUnicode<5>>() {
+            Ok(val) => {
+                let formatted = format!("{}", val);
+                return Ok(AnalysisResult::Stats(
+                    vec![("Data".to_owned(), formatted)],
+                    None,
+                ));
+            }
+            Err(e) => {
+                return Ok(AnalysisResult::Failed(format!(
+                    "Failed to read scalar dataset: {}",
+                    e
+                )));
+            }
+        }
+    }
+
     if d.ndim() != 1 || d.size() == 0 {
+        log::info!("Dataset is not 1D or is empty");
+        log::info!("Dataset ndim: {}, size: {}", d.ndim(), d.size());
         return Ok(AnalysisResult::NotAvailable);
     }
 
-    let dtype = d.dtype()?;
+    log::info!("Dataset dtype: {:?}", dtype.to_descriptor());
     if dtype.is::<f32>() {
         analysis_1d::<f32>(d)
     } else if dtype.is::<f64>() {
@@ -120,6 +150,9 @@ pub fn hdf5_dataset_analysis(d: Arc<Dataset>) -> Result<AnalysisResult, Box<dyn 
         analysis_1d::<u64>(d)
     } else if dtype.is::<bool>() {
         analysis_1d::<bool>(d)
+    // } else if dtype.is::<hdf5::types::FixedUnicode<5>>() {
+    //     log::info!("Dataset is FixedUnicode");
+    //     analysis_unicode(d)
     } else {
         Ok(AnalysisResult::NotAvailable)
     }
