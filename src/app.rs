@@ -311,7 +311,7 @@ impl App {
                                     }
                                     analysis::AnalysisResult::Stats(stats, h) => {
                                         stats_text = stats.to_vec();
-                                        hist_data = Some(h.to_owned());
+                                        hist_data = h.to_owned();
                                     }
                                 },
                             }

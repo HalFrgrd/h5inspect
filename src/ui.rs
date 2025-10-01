@@ -157,11 +157,6 @@ fn render_object_info(frame: &mut Frame, app: &mut App, area: Rect) {
 
     frame.render_widget(&object_info, area);
 
-    let layout = Layout::vertical([Constraint::Percentage(30), Constraint::Percentage(70)])
-        .split(area.inner(Margin::new(1, 1)));
-    let table_area = layout[0];
-    let chart_area = layout[1];
-
     let mut rows = vec![];
 
     let key_col_width = 26;
@@ -204,6 +199,16 @@ fn render_object_info(frame: &mut Frame, app: &mut App, area: Rect) {
         }
     }
 
+    let layout = if let Some(_) = histogram_data {
+        Layout::vertical([Constraint::Percentage(30), Constraint::Percentage(70)])
+    } else {
+        Layout::vertical([Constraint::Percentage(100), Constraint::Percentage(0)])
+    }
+    .split(area.inner(Margin::new(1, 1)));
+
+    let table_area = layout[0];
+    let hist_area = layout[1];
+
     let num_lines_when_rendered: u16 = rows.len().try_into().unwrap();
     let max_scroll_state = num_lines_when_rendered.saturating_sub(table_area.height);
     app.object_info_scroll_state = app.object_info_scroll_state.clamp(0, max_scroll_state);
@@ -228,8 +233,8 @@ fn render_object_info(frame: &mut Frame, app: &mut App, area: Rect) {
 
     if let Some(hist_data) = histogram_data {
         let histogram_widget =
-            hist_plot::histogram_widget(&hist_data, chart_area.height, chart_area.width);
-        frame.render_widget(histogram_widget, chart_area);
+            hist_plot::histogram_widget(&hist_data, hist_area.height, hist_area.width);
+        frame.render_widget(histogram_widget, hist_area);
     }
 }
 

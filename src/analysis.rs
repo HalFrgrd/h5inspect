@@ -14,7 +14,7 @@ pub type HistogramData = Vec<(f32, u32)>;
 
 #[derive(Debug)]
 pub enum AnalysisResult {
-    Stats(Vec<(String, String)>, HistogramData),
+    Stats(Vec<(String, String)>, Option<HistogramData>),
     NotAvailable,
     Failed(String),
 }
@@ -87,7 +87,7 @@ where
         dtoa::Buffer::new().format(std).to_string(),
     ));
 
-    let hist = compute_histogram(&arr_f64)?;
+    let hist = compute_histogram(&arr_f64).ok();
 
     Ok(AnalysisResult::Stats(info, hist))
 }
