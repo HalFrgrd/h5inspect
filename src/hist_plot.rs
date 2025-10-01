@@ -57,14 +57,16 @@ pub fn histogram_widget(
         // Draw histogram bars
         for (i, &count) in counts.iter().enumerate() {
             let x0 = min_bin + i as f32 * bin_width;
-            let x1 = x0 + bin_width;
 
-            let mut r = Rectangle::new(
-                [(x0, 0), (x1, count)],
-                RGBColor(ui::MAGENTA_R, ui::MAGENTA_G, ui::MAGENTA_B),
-            );
-            r.set_margin(0, 0, 5, 5);
-            chart.draw_series(std::iter::once(r))?;
+            let num_lines: usize = 30;
+            let step = bin_width / (num_lines as f32);
+            for j in 6..(num_lines - 5) {
+                let x = x0 + j as f32 * step;
+                chart.draw_series(LineSeries::new(
+                    vec![(x, 0), (x, count)],
+                    &RGBColor(ui::MAGENTA_R, ui::MAGENTA_G, ui::MAGENTA_B),
+                ))?;
+            }
         }
 
         area.present()

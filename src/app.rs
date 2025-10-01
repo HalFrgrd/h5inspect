@@ -166,19 +166,19 @@ fn get_text_for_group(tree_node: &TreeNode<NodeIdT>) -> Vec<(String, String)> {
     let mut res = vec![];
     res.push(("Path".to_string(), group.name().to_string()));
     res.push((
-        "Number of direct groups".to_string(),
+        "Number of groups direct".to_string(),
         num_groups.to_string(),
     ));
     res.push((
-        "Number of total groups".to_string(),
+        "Number of groups total".to_string(),
         format!("{}", tree_node.recursive_num_groups),
     ));
     res.push((
-        "Number of direct datasets".to_string(),
+        "Number of datasets direct".to_string(),
         num_datasets.to_string(),
     ));
     res.push((
-        "Number of total datasets".to_string(),
+        "Number of datasets total".to_string(),
         tree_node.recursive_num_datasets.to_string(),
     ));
     res.push(("Number of attributes".to_string(), num_attrs.to_string()));

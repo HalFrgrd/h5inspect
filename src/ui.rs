@@ -368,7 +368,7 @@ fn render_help_screen(frame: &mut Frame, _app: &App, area: Rect) {
 
     let [_, title_area, text_area] = Layout::vertical([
         Constraint::Length(3),
-        Constraint::Length(12),
+        Constraint::Length(14),
         Constraint::Percentage(100),
     ])
     .areas(area.inner(Margin::new(1, 0)));
@@ -394,7 +394,7 @@ fn render_help_screen(frame: &mut Frame, _app: &App, area: Rect) {
     frame.render_widget(big_text, main_title_area);
 
     let big_text_version = BigText::builder()
-        .pixel_size(PixelSize::Sextant)
+        .pixel_size(PixelSize::Quadrant)
         .lines(vec![Line::styled(
             format!("v{}", env!("CARGO_PKG_VERSION")),
             Style::new().fg(Color::Red).add_modifier(Modifier::BOLD),
