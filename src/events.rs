@@ -3,28 +3,31 @@ use std::time::Duration;
 use crossterm::event::{Event as CrosstermEvent, KeyEvent, MouseEvent};
 use futures::{FutureExt, StreamExt};
 use std::time::Instant;
-use tokio::sync::mpsc;
-#[derive(Clone, Copy, Debug)]
+
+use crate::app::NodeIdT;
+use crate::tree::TreeNode;
+
+#[derive(Clone, Debug)]
 pub enum Event {
     Key(KeyEvent),
     Mouse(MouseEvent),
     AnimationTick,
     Resize,
-    // TreeUpdate(tree::Tree<tree::NodeIdT>, app::TreeNodeToObject),
+    TreeUpdate(TreeNode<NodeIdT>),
 }
 
 #[allow(dead_code)]
 #[derive(Debug)]
 pub struct EventHandler {
-    sender: mpsc::UnboundedSender<Event>,
-    pub receiver: mpsc::UnboundedReceiver<Event>,
+    pub sender: tokio::sync::mpsc::UnboundedSender<Event>,
+    pub receiver: tokio::sync::mpsc::UnboundedReceiver<Event>,
     handler: tokio::task::JoinHandle<()>,
 }
 
 impl EventHandler {
     pub fn new() -> Self {
         let tick_rate = Duration::from_millis(300);
-        let (sender, receiver) = mpsc::unbounded_channel();
+        let (sender, receiver) = tokio::sync::mpsc::unbounded_channel();
         let sender_clone = sender.clone();
         let handler = tokio::spawn(async move {
             let mut reader = crossterm::event::EventStream::new();
@@ -73,14 +76,4 @@ impl EventHandler {
             handler,
         }
     }
-
-    // pub async fn next(&mut self) -> Result<Event, Box<dyn std::error::Error>> {
-    //     self.receiver
-    //         .recv()
-    //         .await
-    //         .ok_or(Box::new(std::io::Error::new(
-    //             std::io::ErrorKind::Other,
-    //             "IO error",
-    //         )))
-    // }
 }

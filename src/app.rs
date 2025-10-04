@@ -653,13 +653,14 @@ impl App {
     ) -> Result<(), Box<dyn std::error::Error>> {
         let h5_file = h5_utils::open_file(&self.h5_file_path)?;
 
-        let (tx, mut rx) = tokio::sync::mpsc::channel::<TreeNode<NodeIdT>>(1);
+        let mut events = events::EventHandler::new();
+
+        // Spawn a task to load the HDF5 file structure since it might be slow
         tokio::spawn(async move {
             let tree = App::tree_from_h5(&h5_file).expect("Failed to parse HDF5 structure");
-            tx.send(tree).await.unwrap();
+            let tree_update = events::Event::TreeUpdate(tree);
+            events.sender.clone().send(tree_update).unwrap();
         });
-
-        let mut events = events::EventHandler::new();
 
         while self.running {
             if let Some(last_selected) = &self.tree_state_last_rendered_selected {
@@ -690,13 +691,12 @@ impl App {
                         events::Event::Key(key) => self.handle_keypress(key),
                         events::Event::Mouse(mouse) => self.handle_mouse(mouse),
                         events::Event::Resize => {}
+                        events::Event::TreeUpdate(tree) => {
+                            self.tree = Some(tree);
+                            self.open_all_tree_nodes();
+                            self.update_filtered_tree();
+                        }
                     }
-                }
-                Some(tree) = rx.recv() => {
-                    self.tree = Some(tree);
-                    // self.tree_state.open(vec![self.tree.as_ref().unwrap().id()]);
-                    self.open_all_tree_nodes();
-                    self.update_filtered_tree();
                 }
             }
         }
