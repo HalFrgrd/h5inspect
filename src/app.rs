@@ -39,8 +39,15 @@ enum AsyncDataAnalysis {
 
 pub type NodeIdT = hdf5_metno_sys::h5i::hid_t;
 
+#[derive(Debug, PartialEq)]
+pub enum AppFinishingState {
+    Continue,
+    Quit,
+    ShouldRunCommand(String, String),
+}
+
 pub struct App {
-    running: bool,
+    running: AppFinishingState,
     pub h5_file_path: PathBuf,
     pub tree_state: tui_tree_widget::TreeState<NodeIdT>,
     pub tree_state_last_rendered_selected: Option<Vec<NodeIdT>>,
@@ -208,7 +215,7 @@ impl App {
         }
 
         App {
-            running: true,
+            running: AppFinishingState::Continue,
             h5_file_path,
             tree_state: tui_tree_widget::TreeState::default(),
             tree_state_last_rendered_selected: None,
@@ -358,7 +365,8 @@ impl App {
         }
     }
 
-    fn on_keypress_tree_mode(&mut self, keycode: KeyCode) -> () {
+    fn on_keypress_tree_mode(&mut self, key: crossterm::event::KeyEvent) -> () {
+        let keycode = key.code;
         match keycode {
             KeyCode::Left => {
                 if self.filtered_tree.is_some() {
@@ -391,6 +399,33 @@ impl App {
             KeyCode::End => {
                 if self.filtered_tree.is_some() {
                     self.tree_state.select_last();
+                }
+            }
+            KeyCode::Char('i') => {
+                if let Ok(post_cmd) = std::env::var("H5INSPECT_POST") {
+                    let last_path = self
+                        .tree
+                        .as_ref()
+                        .and_then(|tree| tree.get_selected_node(self.tree_state.selected()))
+                        .and_then(|node| match &node.hdf5_object {
+                            Some(Hdf5Object::Dataset(dataset)) => Some(dataset.name().to_string()),
+                            _ => None,
+                        });
+
+                    match last_path {
+                        Some(p) => {
+                            self.running = AppFinishingState::ShouldRunCommand(post_cmd, p);
+                        }
+                        None => {
+                            log::debug!(
+                                "Problem finding selected dataset, not running H5INSPECT_POST"
+                            );
+                        }
+                    }
+                } else {
+                    log::debug!(
+                        "Environment variable H5INSPECT_POST not set, not running any command"
+                    );
                 }
             }
             KeyCode::Enter => {
@@ -510,9 +545,9 @@ impl App {
             KeyCode::Delete => {
                 self.search_query_right.pop();
             }
-            keycode => {
+            _ => {
                 refresh_filtered_tree = false;
-                self.on_keypress_tree_mode(keycode);
+                self.on_keypress_tree_mode(key);
             }
         };
         if refresh_filtered_tree {
@@ -650,7 +685,7 @@ impl App {
     pub async fn run<B: ratatui::backend::Backend>(
         mut self,
         mut terminal: ratatui::Terminal<B>,
-    ) -> Result<String, Box<dyn std::error::Error>> {
+    ) -> Result<AppFinishingState, Box<dyn std::error::Error>> {
         let h5_file = h5_utils::open_file(&self.h5_file_path)?;
 
         let mut events = events::EventHandler::new();
@@ -662,10 +697,7 @@ impl App {
             events.sender.clone().send(tree_update).unwrap();
         });
 
-
-        let mut last_path: String = String::new();
-
-        while self.running {
+        while self.running == AppFinishingState::Continue {
             if let Some(last_selected) = &self.tree_state_last_rendered_selected {
                 if last_selected != self.tree_state.selected() {
                     // if the selected node has changed, reset the scroll state
@@ -679,11 +711,11 @@ impl App {
                         .get_selected_node(path_to_selected_node)
                     {
                         self.start_analysis_task(tree_node);
-                        if let Some(Hdf5Object::Dataset(dataset)) =
-                            &tree_node.hdf5_object
-                        {
-                            last_path = dataset.name().to_string();
-                        }
+                        // if let Some(Hdf5Object::Dataset(dataset)) =
+                        //     &tree_node.hdf5_object
+                        // {
+                        //     last_path = dataset.name().to_string();
+                        // }
                     }
                 }
             }
@@ -706,7 +738,7 @@ impl App {
                 }
             }
         }
-        Ok(last_path)
+        Ok(self.running)
     }
 
     fn handle_keypress(&mut self, key: crossterm::event::KeyEvent) {
@@ -714,19 +746,19 @@ impl App {
             // log::debug!("{:?}",  key);
             // if Ctrl+c is pressed, exit
             if key.code == KeyCode::Char('c') && key.modifiers == KeyModifiers::CONTROL {
-                self.running = false;
+                self.running = AppFinishingState::Quit;
             }
 
             match self.mode {
                 SelectionMode::TreeBrowsing => match key.code {
                     KeyCode::Char('q') => {
-                        self.running = false;
+                        self.running = AppFinishingState::Quit;
                     }
                     KeyCode::Char('/') => {
                         self.mode = SelectionMode::SearchQueryEditing;
                     }
-                    other => {
-                        self.on_keypress_tree_mode(other);
+                    _ => {
+                        self.on_keypress_tree_mode(key);
                     }
                 },
                 SelectionMode::SearchQueryEditing => match key.code {
@@ -739,7 +771,7 @@ impl App {
                 },
                 SelectionMode::ObjectInfoInspecting => match key.code {
                     KeyCode::Char('q') => {
-                        self.running = false;
+                        self.running = AppFinishingState::Quit;
                     }
                     KeyCode::Char('/') => {
                         self.mode = SelectionMode::SearchQueryEditing;

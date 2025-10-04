@@ -48,20 +48,20 @@ fn main() -> Result<(), Box<dyn Error>> {
     crossterm::execute!(std::io::stdout(), crossterm::event::DisableMouseCapture)?;
     ratatui::restore();
 
-    if let Ok(ref last_path) = res {
-        let post_cmd = std::env::var("H5INSPECT_POST");
-        if !last_path.is_empty() && post_cmd.is_ok() {
-            let post_cmd = post_cmd.unwrap();
-            println!("Last selected dataset: {}. will run {}", last_path, post_cmd);
+    if let Ok(ref finishing_state) = res {
+        if let app::AppFinishingState::ShouldRunCommand(post_cmd, ds_path) = finishing_state {
+            println!("Last selected dataset: {}. will run {}", ds_path, post_cmd);
             let mut child = std::process::Command::new(post_cmd)
                 .arg(h5_file_name)
-                .arg(last_path)
+                .arg(ds_path)
                 .stdin(std::process::Stdio::inherit())
                 .stdout(std::process::Stdio::inherit())
                 .stderr(std::process::Stdio::inherit())
                 .spawn()?;
             let status = child.wait()?;
-            if !status.success() {
+            if status.success() {
+                println!("H5INSPECT_POST script exited successfully");
+            } else {
                 eprintln!("H5INSPECT_POST script exited with status: {}", status);
             }
         }
