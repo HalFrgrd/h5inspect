@@ -7,6 +7,7 @@ use crate::ui::ui;
 use crossterm::event::{MouseButton, MouseEventKind};
 use hdf5_metno as hdf5;
 
+use core::panic;
 use crossterm::event::{KeyCode, KeyModifiers};
 use dirs;
 use humansize::{format_size, DECIMAL};
@@ -83,12 +84,9 @@ fn format_integer_with_underscore(num: u64) -> String {
 }
 
 fn get_text_for_dataset(tree_node: &TreeNode<NodeIdT>) -> Vec<(String, String)> {
-    let Hdf5Object::Dataset(dataset) = &tree_node
-        .hdf5_object
-        .as_ref()
-        .expect("No hdf5 object found in tree_node")
-    else {
-        panic!("Expected a Dataset, found a Group or None");
+    let dataset = match tree_node.hdf5_object.as_ref() {
+        Some(Hdf5Object::Dataset(dataset)) => dataset,
+        _ => panic!("Expected a Dataset, found a Group or None"),
     };
 
     let shape = dataset.shape();
@@ -150,12 +148,9 @@ fn get_text_for_dataset(tree_node: &TreeNode<NodeIdT>) -> Vec<(String, String)> 
 }
 
 fn get_text_for_group(tree_node: &TreeNode<NodeIdT>) -> Vec<(String, String)> {
-    let Hdf5Object::Group(group) = &tree_node
-        .hdf5_object
-        .as_ref()
-        .expect("No hdf5 object found in tree_node")
-    else {
-        panic!("Expected a Dataset, found a Group or None");
+    let group = match tree_node.hdf5_object.as_ref() {
+        Some(Hdf5Object::Group(group)) => group,
+        _ => panic!("Expected a Group, found a Dataset or None"),
     };
 
     let num_groups = group.groups().unwrap_or(vec![]).len();
@@ -278,29 +273,31 @@ impl App {
     }
 
     pub fn get_text_for(
-        &mut self,
+        &self,
         path: &[NodeIdT],
     ) -> Option<(Vec<(String, String)>, Option<analysis::HistogramData>)> {
         if let Some(tree) = &self.tree {
             match tree.get_selected_node(path) {
                 Some(ref tree_node) => match &tree_node.hdf5_object {
-                    Some(Hdf5Object::Dataset(dataset)) => {
+                    Some(Hdf5Object::Dataset(_)) => {
                         let mut info = get_text_for_dataset(&tree_node);
 
-                        let k = tree_node.id().clone();
+                        let key = tree_node.id().clone();
 
-                        let stats_text: Vec<(String, String)>;
-                        let loading_text = vec![(
-                            "Stats".into(),
-                            "Loading".to_owned() + &".".repeat((self.animation_state % 4).into()),
-                        )];
+                        let mut stats_text: Vec<(String, String)> = vec![];
                         let mut hist_data: Option<analysis::HistogramData> = None;
 
-                        let mut info_dict = self.node_id_to_analysis.lock().unwrap();
+                        let info_dict = self.node_id_to_analysis.lock().unwrap();
 
-                        if let Some(node_info) = info_dict.get(&k) {
+                        if let Some(node_info) = info_dict.get(&key) {
                             match node_info {
-                                AsyncDataAnalysis::Loading => stats_text = loading_text,
+                                AsyncDataAnalysis::Loading => {
+                                    stats_text = vec![(
+                                        "Stats".into(),
+                                        "Loading".to_owned()
+                                            + &".".repeat((self.animation_state % 4).into()),
+                                    )]
+                                }
                                 AsyncDataAnalysis::Ready(val) => match val {
                                     analysis::AnalysisResult::Failed(s) => {
                                         stats_text =
@@ -315,27 +312,7 @@ impl App {
                                     }
                                 },
                             }
-                        } else {
-                            // we need to kick of the processing for this dataset
-                            stats_text = loading_text;
-                            info_dict.insert(k.clone(), AsyncDataAnalysis::Loading);
-
-                            let thread_arc: Arc<Mutex<HashMap<NodeIdT, AsyncDataAnalysis>>> =
-                                Arc::clone(&self.node_id_to_analysis);
-                            let thread_dataset = dataset.clone();
-                            tokio::task::spawn_blocking(move || {
-                                let analysis = analysis::hdf5_dataset_analysis(thread_dataset);
-
-                                let processed_analysis = analysis
-                                    .unwrap_or_else(|s| AnalysisResult::Failed(s.to_string()));
-
-                                let mut info_dict = thread_arc.lock().unwrap();
-                                info_dict.insert(
-                                    k.clone(),
-                                    AsyncDataAnalysis::Ready(processed_analysis),
-                                );
-                            });
-                        };
+                        }
 
                         info.extend(stats_text);
 
@@ -429,12 +406,14 @@ impl App {
             }
             KeyCode::Tab => {
                 if self.filtered_tree.is_some() {
-                    self.on_tab();
+                    self.tree_state
+                        .select_relative(|x| x.map_or(0, |current| current.saturating_add(1)));
                 }
             }
             KeyCode::BackTab => {
                 if self.filtered_tree.is_some() {
-                    self.on_shift_tab();
+                    self.tree_state
+                        .select_relative(|x| x.map_or(0, |current| current.saturating_sub(1)));
                 }
             }
             KeyCode::Char('f') => {
@@ -481,16 +460,6 @@ impl App {
         let cursor_pos = self.search_query_left.len();
 
         (text, cursor_pos.try_into().unwrap())
-    }
-
-    fn on_tab(&mut self) -> () {
-        self.tree_state
-            .select_relative(|x| x.map_or(0, |current| current.saturating_add(1)));
-    }
-
-    fn on_shift_tab(&mut self) -> () {
-        self.tree_state
-            .select_relative(|x| x.map_or(0, |current| current.saturating_sub(1)));
     }
 
     fn on_keypress_search_mode(&mut self, key: crossterm::event::KeyEvent) {
@@ -653,6 +622,32 @@ impl App {
         }
     }
 
+    fn start_analysis_task(&self, tree_node: &TreeNode<NodeIdT>) {
+        if let Some(Hdf5Object::Dataset(d)) = &tree_node.hdf5_object {
+            let mut info_dict = self.node_id_to_analysis.lock().unwrap();
+            let key = tree_node.id().clone();
+            if info_dict.get(&key).is_some() {
+                // already being processed or done
+                return;
+            }
+
+            info_dict.insert(key.clone(), AsyncDataAnalysis::Loading);
+
+            let thread_arc: Arc<Mutex<HashMap<NodeIdT, AsyncDataAnalysis>>> =
+                Arc::clone(&self.node_id_to_analysis);
+            let d = Arc::clone(d);
+            tokio::task::spawn_blocking(move || {
+                let analysis = analysis::hdf5_dataset_analysis(d);
+
+                let processed_analysis =
+                    analysis.unwrap_or_else(|s| AnalysisResult::Failed(s.to_string()));
+
+                let mut info_dict = thread_arc.lock().unwrap();
+                info_dict.insert(key, AsyncDataAnalysis::Ready(processed_analysis));
+            });
+        }
+    }
+
     pub async fn run<B: ratatui::backend::Backend>(
         mut self,
         mut terminal: ratatui::Terminal<B>,
@@ -672,6 +667,16 @@ impl App {
                 if last_selected != self.tree_state.selected() {
                     // if the selected node has changed, reset the scroll state
                     self.object_info_scroll_state = 0;
+
+                    let path_to_selected_node = self.tree_state.selected();
+                    if let Some(tree_node) = self
+                        .tree
+                        .as_ref()
+                        .unwrap()
+                        .get_selected_node(path_to_selected_node)
+                    {
+                        self.start_analysis_task(tree_node);
+                    }
                 }
             }
             terminal.draw(|frame| ui(frame, &mut self))?;
