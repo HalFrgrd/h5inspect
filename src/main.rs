@@ -50,7 +50,10 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     if let Ok(ref finishing_state) = res {
         if let app::AppFinishingState::ShouldRunCommand(post_cmd, ds_path) = finishing_state {
-            println!("Last selected dataset: {}. will run {}", ds_path, post_cmd);
+            println!(
+                "H5INSPECT_POST running {} {} {}",
+                post_cmd, h5_file_name, ds_path
+            );
             let mut child = std::process::Command::new(post_cmd)
                 .arg(h5_file_name)
                 .arg(ds_path)
@@ -59,9 +62,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .stderr(std::process::Stdio::inherit())
                 .spawn()?;
             let status = child.wait()?;
-            if status.success() {
-                println!("H5INSPECT_POST script exited successfully");
-            } else {
+            if !status.success() {
                 eprintln!("H5INSPECT_POST script exited with status: {}", status);
             }
         }

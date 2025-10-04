@@ -365,8 +365,7 @@ impl App {
         }
     }
 
-    fn on_keypress_tree_mode(&mut self, key: crossterm::event::KeyEvent) -> () {
-        let keycode = key.code;
+    fn on_keypress_tree_mode(&mut self, keycode: crossterm::event::KeyCode) -> () {
         match keycode {
             KeyCode::Left => {
                 if self.filtered_tree.is_some() {
@@ -545,9 +544,9 @@ impl App {
             KeyCode::Delete => {
                 self.search_query_right.pop();
             }
-            _ => {
+            other => {
                 refresh_filtered_tree = false;
-                self.on_keypress_tree_mode(key);
+                self.on_keypress_tree_mode(other);
             }
         };
         if refresh_filtered_tree {
@@ -584,6 +583,9 @@ impl App {
             }
             KeyCode::Char('L') => {
                 self.show_logs = !self.show_logs;
+            }
+            KeyCode::Char('i') => {
+                self.on_keypress_tree_mode(keycode);
             }
             _ => {}
         };
@@ -757,8 +759,8 @@ impl App {
                     KeyCode::Char('/') => {
                         self.mode = SelectionMode::SearchQueryEditing;
                     }
-                    _ => {
-                        self.on_keypress_tree_mode(key);
+                    other => {
+                        self.on_keypress_tree_mode(other);
                     }
                 },
                 SelectionMode::SearchQueryEditing => match key.code {

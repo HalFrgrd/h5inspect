@@ -419,7 +419,7 @@ fn render_help_screen(frame: &mut Frame, _app: &App, area: Rect) {
         .areas(text_area);
     let [top_of_table_area, table_area, bottom_of_table_area] = Layout::vertical([
         Constraint::Length(3),
-        Constraint::Length(11),
+        Constraint::Length(13),
         Constraint::Length(5),
     ])
     .flex(Flex::Center)
@@ -472,6 +472,14 @@ fn render_help_screen(frame: &mut Frame, _app: &App, area: Rect) {
                 Cell::new(Span::from("Quit").style(DEFAULT_TEXT_STYLE)),
                 Cell::new(Span::from("q/Ctrl+c").style(KEY_BINDING_STYLE)),
             ]),
+            Row::new([
+                Cell::new(
+                    Text::from("Launch $H5INSPECT_POST\non selected dataset")
+                        .style(DEFAULT_TEXT_STYLE),
+                ),
+                Cell::new(Span::from("i").style(KEY_BINDING_STYLE)),
+            ])
+            .height(2),
         ],
         table_widths,
     );
