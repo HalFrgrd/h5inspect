@@ -650,7 +650,7 @@ impl App {
     pub async fn run<B: ratatui::backend::Backend>(
         mut self,
         mut terminal: ratatui::Terminal<B>,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) -> Result<String, Box<dyn std::error::Error>> {
         let h5_file = h5_utils::open_file(&self.h5_file_path)?;
 
         let mut events = events::EventHandler::new();
@@ -661,6 +661,9 @@ impl App {
             let tree_update = events::Event::TreeUpdate(tree);
             events.sender.clone().send(tree_update).unwrap();
         });
+
+
+        let mut last_path: String = String::new();
 
         while self.running {
             if let Some(last_selected) = &self.tree_state_last_rendered_selected {
@@ -676,31 +679,34 @@ impl App {
                         .get_selected_node(path_to_selected_node)
                     {
                         self.start_analysis_task(tree_node);
+                        if let Some(Hdf5Object::Dataset(dataset)) =
+                            &tree_node.hdf5_object
+                        {
+                            last_path = dataset.name().to_string();
+                        }
                     }
                 }
             }
             terminal.draw(|frame| ui(frame, &mut self))?;
             self.tree_state_last_rendered_selected = Some(self.tree_state.selected().to_vec());
 
-            tokio::select! {
-                Some(event) = events.receiver.recv() => {
-                    match event {
-                        events::Event::AnimationTick => {
-                            self.animation_state = self.animation_state.wrapping_add(1);
-                        }
-                        events::Event::Key(key) => self.handle_keypress(key),
-                        events::Event::Mouse(mouse) => self.handle_mouse(mouse),
-                        events::Event::Resize => {}
-                        events::Event::TreeUpdate(tree) => {
-                            self.tree = Some(tree);
-                            self.open_all_tree_nodes();
-                            self.update_filtered_tree();
-                        }
+            if let Some(event) = events.receiver.recv().await {
+                match event {
+                    events::Event::AnimationTick => {
+                        self.animation_state = self.animation_state.wrapping_add(1);
+                    }
+                    events::Event::Key(key) => self.handle_keypress(key),
+                    events::Event::Mouse(mouse) => self.handle_mouse(mouse),
+                    events::Event::Resize => {}
+                    events::Event::TreeUpdate(tree) => {
+                        self.tree = Some(tree);
+                        self.open_all_tree_nodes();
+                        self.update_filtered_tree();
                     }
                 }
             }
         }
-        Ok(())
+        Ok(last_path)
     }
 
     fn handle_keypress(&mut self, key: crossterm::event::KeyEvent) {

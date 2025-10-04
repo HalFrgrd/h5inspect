@@ -1,5 +1,5 @@
 use crate::app::App;
-use clap::{Arg, Command};
+use clap;
 use color_eyre::Result;
 use std::error::Error;
 
@@ -17,11 +17,11 @@ mod ui;
 
 fn main() -> Result<(), Box<dyn Error>> {
     // crate::h5_utils::generate_dummy_file()?;
-    let matches = Command::new("h5inspect")
+    let matches = clap::Command::new("h5inspect")
         .author("Hal Frigaard")
         .about("Simple TUI to inspect h5 files")
         .arg(
-            Arg::new("h5file")
+            clap::Arg::new("h5file")
                 .value_name("FILE")
                 .help("Name of hdf5 file to inspect")
                 .value_hint(clap::ValueHint::FilePath)
@@ -47,7 +47,26 @@ fn main() -> Result<(), Box<dyn Error>> {
     let res = runtime.block_on(app.run(terminal));
     crossterm::execute!(std::io::stdout(), crossterm::event::DisableMouseCapture)?;
     ratatui::restore();
-    res
+
+    if let Ok(ref last_path) = res {
+        let post_cmd = std::env::var("H5INSPECT_POST");
+        if !last_path.is_empty() && post_cmd.is_ok() {
+            let post_cmd = post_cmd.unwrap();
+            println!("Last selected dataset: {}. will run {}", last_path, post_cmd);
+            let mut child = std::process::Command::new(post_cmd)
+                .arg(h5_file_name)
+                .arg(last_path)
+                .stdin(std::process::Stdio::inherit())
+                .stdout(std::process::Stdio::inherit())
+                .stderr(std::process::Stdio::inherit())
+                .spawn()?;
+            let status = child.wait()?;
+            if !status.success() {
+                eprintln!("H5INSPECT_POST script exited with status: {}", status);
+            }
+        }
+    }
+    res.map(|_| ())
 }
 
 fn build_runtime() -> tokio::runtime::Runtime {

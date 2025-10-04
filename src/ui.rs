@@ -167,7 +167,6 @@ fn render_object_info(frame: &mut Frame, app: &mut App, area: Rect) {
 
     let selected = app.tree_state.selected().to_vec();
     if !selected.is_empty() {
-        // selected is of form: ["/group1", "/group1/dataset1"]
         let info = app.get_text_for(&selected);
         if let Some((info, hist_data_opt)) = info {
             histogram_data = hist_data_opt;
