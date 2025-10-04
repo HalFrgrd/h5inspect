@@ -137,11 +137,7 @@ fn render_object_info(frame: &mut Frame, app: &mut App, area: Rect) {
 
     let object_info = Block::new()
         .title("Object info")
-        .title_top(
-            Line::from("Help screen ('?')")
-                .right_aligned()
-                .style(get_style(Styles::DefaultText, app.mode)),
-        )
+        .title_top(Line::from("Help screen ('?')").right_aligned())
         .title_bottom(
             Line::from(format!("# background analysis tasks: {}", num_active_tasks))
                 .left_aligned()

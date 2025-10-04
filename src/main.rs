@@ -51,7 +51,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     if let Ok(ref finishing_state) = res {
         if let app::AppFinishingState::ShouldRunCommand(post_cmd, ds_path) = finishing_state {
             println!(
-                "H5INSPECT_POST running {} {} {}",
+                "H5INSPECT_POST running: {} {} {}",
                 post_cmd, h5_file_name, ds_path
             );
             let mut child = std::process::Command::new(post_cmd)

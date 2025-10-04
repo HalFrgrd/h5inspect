@@ -7,6 +7,7 @@ use crate::ui::ui;
 use crossterm::event::{MouseButton, MouseEventKind};
 use hdf5_metno as hdf5;
 
+use chrono::{DateTime, Local};
 use core::panic;
 use crossterm::event::{KeyCode, KeyModifiers};
 use dirs;
@@ -14,6 +15,8 @@ use humansize::{format_size, DECIMAL};
 use log;
 use ratatui::layout::{Position, Rect};
 use std::collections::HashMap;
+use std::fs;
+use std::os::unix::fs::PermissionsExt;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::vec;
@@ -337,7 +340,38 @@ impl App {
 
                 Some((info, hist_data))
             }
-            Hdf5Object::Group(_) => Some((get_text_for_group(&tree_node), None)),
+            Hdf5Object::Group(_) => {
+                let mut info = get_text_for_group(&tree_node);
+
+                // If this is the root group, add file info
+                if let Some(Hdf5Object::Group(group)) = tree_node.hdf5_object.as_ref() {
+                    if group.name() == "/" {
+                        let path = &self.h5_file_path;
+                        if let Ok(metadata) = fs::metadata(path) {
+                            if let Ok(modified) = metadata.modified() {
+                                // Convert SystemTime -> chrono::DateTime<Local>
+                                let datetime: DateTime<Local> = DateTime::<Local>::from(modified);
+                                info.push((
+                                    "File last modified".to_string(),
+                                    datetime.format("%Y-%m-%d %H:%M:%S").to_string(),
+                                ));
+                            }
+
+                            // Permissions
+                            let perms = metadata.permissions();
+                            #[cfg(unix)]
+                            {
+                                info.push((
+                                    "File permissions".to_string(),
+                                    format!("{:o}", perms.mode()),
+                                ));
+                            }
+                        }
+                    }
+                }
+
+                Some((info, None))
+            }
         }
     }
 
