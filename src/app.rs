@@ -276,62 +276,61 @@ impl App {
         &self,
         path: &[NodeIdT],
     ) -> Option<(Vec<(String, String)>, Option<analysis::HistogramData>)> {
-        if let Some(tree) = &self.tree {
-            match tree.get_selected_node(path) {
-                Some(ref tree_node) => match &tree_node.hdf5_object {
-                    Some(Hdf5Object::Dataset(_)) => {
-                        let mut info = get_text_for_dataset(&tree_node);
+        let tree = match self.tree.as_ref() {
+            Some(tree) => tree,
+            None => return None,
+        };
 
-                        let key = tree_node.id().clone();
+        let tree_node = match tree.get_selected_node(path) {
+            Some(node) => node,
+            None => return None,
+        };
 
-                        let mut stats_text: Vec<(String, String)> = vec![];
-                        let mut hist_data: Option<analysis::HistogramData> = None;
+        let obj = match tree_node.hdf5_object.as_ref() {
+            Some(obj) => obj,
+            None => return None,
+        };
 
-                        let info_dict = self.node_id_to_analysis.lock().unwrap();
+        match obj {
+            Hdf5Object::Dataset(_) => {
+                let mut info = get_text_for_dataset(&tree_node);
 
-                        if let Some(node_info) = info_dict.get(&key) {
-                            match node_info {
-                                AsyncDataAnalysis::Loading => {
-                                    stats_text = vec![(
-                                        "Stats".into(),
-                                        "Loading".to_owned()
-                                            + &".".repeat((self.animation_state % 4).into()),
-                                    )]
-                                }
-                                AsyncDataAnalysis::Ready(val) => match val {
-                                    analysis::AnalysisResult::Failed(s) => {
-                                        stats_text =
-                                            vec![("Stats".into(), format!("Failed! ({})", s))];
-                                    }
-                                    analysis::AnalysisResult::NotAvailable => {
-                                        stats_text = vec![("Stats".into(), "Not available".into())];
-                                    }
-                                    analysis::AnalysisResult::Stats(stats, h) => {
-                                        stats_text = stats.to_vec();
-                                        hist_data = h.to_owned();
-                                    }
-                                },
-                            }
+                let key = tree_node.id().clone();
+
+                let mut stats_text: Vec<(String, String)> = vec![];
+                let mut hist_data: Option<analysis::HistogramData> = None;
+
+                let info_dict = self.node_id_to_analysis.lock().unwrap();
+
+                if let Some(node_info) = info_dict.get(&key) {
+                    match node_info {
+                        AsyncDataAnalysis::Loading => {
+                            stats_text = vec![(
+                                "Stats".into(),
+                                "Loading".to_owned()
+                                    + &".".repeat((self.animation_state % 4).into()),
+                            )]
                         }
-
-                        info.extend(stats_text);
-
-                        Some((info, hist_data))
+                        AsyncDataAnalysis::Ready(val) => match val {
+                            analysis::AnalysisResult::Failed(s) => {
+                                stats_text = vec![("Stats".into(), format!("Failed! ({})", s))];
+                            }
+                            analysis::AnalysisResult::NotAvailable => {
+                                stats_text = vec![("Stats".into(), "Not available".into())];
+                            }
+                            analysis::AnalysisResult::Stats(stats, h) => {
+                                stats_text = stats.to_vec();
+                                hist_data = h.to_owned();
+                            }
+                        },
                     }
-                    Some(Hdf5Object::Group(_)) => Some((get_text_for_group(&tree_node), None)),
-                    None => {
-                        log::debug!("No hdf5 object found at path {:?}", path);
-                        None
-                    }
-                },
-                None => {
-                    log::debug!("Couldn't find object at path {:?}", path);
-                    None
                 }
+
+                info.extend(stats_text);
+
+                Some((info, hist_data))
             }
-        } else {
-            log::debug!("No tree found");
-            None
+            Hdf5Object::Group(_) => Some((get_text_for_group(&tree_node), None)),
         }
     }
 
