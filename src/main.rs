@@ -120,7 +120,7 @@ mod tests {
         let res = runtime.block_on(async {
             tokio::select! {
                 res = app.run(terminal) => {
-                    res
+                    res.map(|_| ())
                 }
                 _ = tokio::time::sleep(std::time::Duration::from_secs(2)) => {
                     println!("Timer expired before app returned, nice.");

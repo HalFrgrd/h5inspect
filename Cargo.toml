@@ -12,8 +12,8 @@ dtoa = "1.0.10"
 duplicate = "2.0.0"
 futures = "0.3.31"
 fuzzy-matcher = "0.3.7"
-hdf5-metno = { version = "0.10.1", features = ["static"] }
-hdf5-metno-sys = { version = "0.10.0", features = ["static"] }
+hdf5-metno = { version = "0.10.1", features = ["static", "zlib"] }
+hdf5-metno-sys = { version = "0.10.0", features = ["static", "zlib"] }
 humansize = "=2.1.3"
 log = "0.4.22"
 ndarray = "0.16.1"
