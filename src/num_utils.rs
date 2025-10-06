@@ -1,5 +1,6 @@
 use duplicate::duplicate_item;
 use num_traits::ToPrimitive;
+use numfmt::{Formatter, Precision, Scales};
 use std::fmt::Display;
 
 pub trait Summable: Sized {
@@ -74,5 +75,53 @@ pub trait MyToPrimitive {
 impl MyToPrimitive for num_type {
     fn my_to_f64(&self) -> Option<f64> {
         to_f64_impl
+    }
+}
+
+pub fn format_integer_with_underscore(num: u64) -> String {
+    let num_str = num.to_string();
+    let mut formatted = String::new();
+    let len = num_str.len();
+
+    for (i, c) in num_str.chars().enumerate() {
+        if i > 0 && (len - i) % 3 == 0 {
+            formatted.push('_');
+        }
+        formatted.push(c);
+    }
+
+    formatted
+}
+
+pub fn file_size_fmt_no_scale(size: u64) -> String {
+    format_integer_with_underscore(size) + " B"
+}
+
+pub fn file_size_fmt(size: u64) -> String {
+    if size < 1024 {
+        return format!("{} B", size);
+    }
+
+    let mut f: Formatter = Formatter::new()
+        .scales(Scales::metric())
+        .precision(Precision::Decimals(3))
+        .suffix("B")
+        .unwrap();
+
+    f.fmt2(size).to_owned()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_file_size_fmt() {
+        assert_eq!(file_size_fmt(1u64), "1 B");
+        assert_eq!(file_size_fmt(999u64), "999 B");
+        assert_eq!(file_size_fmt(1024u64), "1.024 kB");
+        assert_eq!(file_size_fmt(123123123123), "123.123 GB");
+        assert_eq!(file_size_fmt(5123123123123), "5.123 TB");
+        assert_eq!(file_size_fmt_no_scale(123123123123), "123_123_123_123 B");
     }
 }

@@ -2,6 +2,7 @@ use crate::analysis;
 use crate::analysis::AnalysisResult;
 use crate::events;
 use crate::h5_utils;
+use crate::num_utils;
 use crate::tree::TreeNode;
 use crate::ui::ui;
 use crossterm::event::{MouseButton, MouseEventKind};
@@ -11,7 +12,6 @@ use chrono::{DateTime, Local};
 use core::panic;
 use crossterm::event::{KeyCode, KeyModifiers};
 use dirs;
-use humansize::{format_size, DECIMAL};
 use log;
 use ratatui::layout::{Position, Rect};
 use std::collections::HashMap;
@@ -78,21 +78,6 @@ pub enum SelectionMode {
     HelpScreen,
 }
 
-fn format_integer_with_underscore(num: u64) -> String {
-    let num_str = num.to_string();
-    let mut formatted = String::new();
-    let len = num_str.len();
-
-    for (i, c) in num_str.chars().enumerate() {
-        if i > 0 && (len - i) % 3 == 0 {
-            formatted.push('_');
-        }
-        formatted.push(c);
-    }
-
-    formatted
-}
-
 fn get_text_for_dataset(tree_node: &TreeNode<NodeIdT>) -> Vec<(String, String)> {
     let dataset = match tree_node.hdf5_object.as_ref() {
         Some(Hdf5Object::Dataset(dataset)) => dataset,
@@ -120,6 +105,7 @@ fn get_text_for_dataset(tree_node: &TreeNode<NodeIdT>) -> Vec<(String, String)> 
     // Get storage size vs data size
     let storage_size = dataset.storage_size();
     let data_size = dataset.size() * dataset.dtype().map_or(0, |dt| dt.size());
+    let data_size: u64 = data_size.try_into().unwrap_or(0);
     let compression_ratio = if storage_size > 0 {
         data_size as f64 / storage_size as f64
     } else {
@@ -136,17 +122,17 @@ fn get_text_for_dataset(tree_node: &TreeNode<NodeIdT>) -> Vec<(String, String)> 
     res.push((
         "Storage size".to_string(),
         format!(
-            "{} ({} B)",
-            format_size(storage_size, DECIMAL),
-            format_integer_with_underscore(storage_size)
+            "{} ({})",
+            num_utils::file_size_fmt(storage_size),
+            num_utils::file_size_fmt_no_scale(storage_size)
         ),
     ));
     res.push((
         "Data size".to_string(),
         format!(
-            "{} ({} B)",
-            format_size(data_size, DECIMAL),
-            format_integer_with_underscore(data_size.try_into().unwrap_or(0))
+            "{} ({})",
+            num_utils::file_size_fmt(data_size),
+            num_utils::file_size_fmt_no_scale(data_size)
         ),
     ));
     res.push((
@@ -191,9 +177,9 @@ fn get_text_for_group(tree_node: &TreeNode<NodeIdT>) -> Vec<(String, String)> {
     res.push((
         "Storage size".to_string(),
         format!(
-            "{} ({} B)",
-            format_size(tree_node.recursive_storage_data_size, DECIMAL),
-            format_integer_with_underscore(tree_node.recursive_storage_data_size)
+            "{} ({})",
+            num_utils::file_size_fmt(tree_node.recursive_storage_data_size),
+            num_utils::file_size_fmt_no_scale(tree_node.recursive_storage_data_size)
         ),
     ));
     res
