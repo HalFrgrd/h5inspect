@@ -62,8 +62,6 @@ where
 
     let v: Array1<T> = d.read_1d()?;
 
-    info.push(("Data".to_owned(), format!("{}", v)));
-
     let sum: T::AccumulatorType = v.iter().fold(T::AccumulatorType::zero(), |acc, x| {
         acc + x.to_owned().into()
     });
@@ -86,6 +84,9 @@ where
         "Std".to_owned(),
         dtoa::Buffer::new().format(std).to_string(),
     ));
+
+    info.push(("Data preview".to_owned(), format!("{}", v)));
+
 
     let hist = compute_histogram(&arr_f64).ok();
 

@@ -470,7 +470,7 @@ fn render_help_screen(frame: &mut Frame, _app: &App, area: Rect) {
             ]),
             Row::new([
                 Cell::new(
-                    Text::from("Launch $H5INSPECT_POST\non selected dataset")
+                    Text::from("Launch `$H5INSPECT_POST\n[file] [dataset]`")
                         .style(DEFAULT_TEXT_STYLE),
                 ),
                 Cell::new(Span::from("i").style(KEY_BINDING_STYLE)),
