@@ -111,6 +111,24 @@ pub fn file_size_fmt(size: u64) -> String {
     f.fmt2(size).to_owned()
 }
 
+pub fn large_int_fmt(size: u64) -> String {
+    if size < 1000 {
+        return format!("{}", size);
+    }
+
+    let mut f: Formatter = Formatter::new()
+        .scales(Scales::metric())
+        .precision(Precision::Decimals(1));
+
+    f.fmt2(size).to_owned()
+}
+
+pub fn basic_float_fmt(x: f32) -> String {
+    let mut f: Formatter = Formatter::new().precision(Precision::Significance(3));
+
+    f.fmt2(x).to_owned()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -123,5 +141,10 @@ mod tests {
         assert_eq!(file_size_fmt(123123123123), "123.123 GB");
         assert_eq!(file_size_fmt(5123123123123), "5.123 TB");
         assert_eq!(file_size_fmt_no_scale(123123123123), "123_123_123_123 B");
+
+        assert_eq!(large_int_fmt(1u64), "1");
+        assert_eq!(large_int_fmt(999u64), "999");
+        assert_eq!(large_int_fmt(1000u64), "1.0 k");
+        assert_eq!(large_int_fmt(98701928390123), "98.7 T");
     }
 }

@@ -8,6 +8,7 @@ use plotters_ratatui_backend::{
 };
 
 use crate::analysis;
+use crate::num_utils;
 
 pub fn histogram_widget(
     hist_data: &analysis::HistogramData,
@@ -43,8 +44,9 @@ pub fn histogram_widget(
             // .bold_line_style(WHITE)
             // .y_desc("Count")
             // .x_desc("Bucket")
+            .y_label_formatter(&|y| num_utils::large_int_fmt(*y as u64))
             .x_labels(2u16.max(widget_width / 10).into())
-            .x_label_formatter(&|x| format!("{:e}", x))
+            .x_label_formatter(&|x| num_utils::basic_float_fmt(*x))
             // .axis_desc_style(("sans-serif", 15).into_font().color(&WHITE))
             .axis_style(ShapeStyle {
                 color: WHITE.into(),
