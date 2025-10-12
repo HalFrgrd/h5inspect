@@ -422,7 +422,7 @@ fn render_help_screen(frame: &mut Frame, _app: &App, area: Rect) {
     .areas(table_area);
 
     let top_of_table_text = Paragraph::new(vec![
-        Line::from("Simple TUI to inspect hdf5 files."),
+        Line::from("A terminal based HDF5 file inspector."),
         Line::from(""),
         Line::from("Key bindings")
             .style(KEY_BINDING_TITLE_STYLE)
