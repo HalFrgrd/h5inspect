@@ -356,7 +356,7 @@ fn get_help_screen_area(area: Rect) -> Rect {
     area
 }
 
-fn render_help_screen(frame: &mut Frame, _app: &App, area: Rect) {
+fn render_help_screen(frame: &mut Frame, app: &App, area: Rect) {
     let help_block = Block::new()
         .title("Help")
         .borders(Borders::ALL)
@@ -408,20 +408,11 @@ fn render_help_screen(frame: &mut Frame, _app: &App, area: Rect) {
     const KEY_BINDING_STYLE: Style = Style::new().fg(Color::Yellow);
     const DEFAULT_TEXT_STYLE: Style = Style::new().fg(Color::White);
 
-    let table_widths = [Constraint::Length(24), Constraint::Length(30)];
-
     let [table_area] = Layout::horizontal([Constraint::Length(70)])
         .flex(Flex::Center)
         .areas(text_area);
-    let [top_of_table_area, table_area, bottom_of_table_area] = Layout::vertical([
-        Constraint::Length(3),
-        Constraint::Length(13),
-        Constraint::Length(2),
-    ])
-    .flex(Flex::Center)
-    .areas(table_area);
 
-    let top_of_table_text = Paragraph::new(vec![
+    let help_paragraph = Paragraph::new(vec![
         Line::from(vec![
             Span::raw("A terminal based HDF5 file inspector. Press "),
             Span::raw("Esc/q/?").style(KEY_BINDING_STYLE),
@@ -431,59 +422,54 @@ fn render_help_screen(frame: &mut Frame, _app: &App, area: Rect) {
         Line::from("Key bindings")
             .style(KEY_BINDING_TITLE_STYLE)
             .centered(),
-    ]).wrap(Wrap { trim: true });
-    frame.render_widget(top_of_table_text, top_of_table_area);
+        Line::from(""),
+        Line::from(vec![
+            Span::from("Navigate: ").style(DEFAULT_TEXT_STYLE),
+            Span::from("←,↑,→,↓, h,j,k,l, Home,End,PageUp,PageDown, click,scroll").style(KEY_BINDING_STYLE),
+        ]),
+        Line::from(""),
+        Line::from(vec![
+            Span::from("Close/open group:    ").style(DEFAULT_TEXT_STYLE),
+            Span::from("Enter/c").style(KEY_BINDING_STYLE),
+        ]),
+        Line::from(""),
+        Line::from(vec![
+            Span::from("Go to top of tree:   ").style(DEFAULT_TEXT_STYLE),
+            Span::from("g").style(KEY_BINDING_STYLE),
+        ]),
+        Line::from(""),
+        Line::from(vec![
+            Span::from("Go to bottom of tree: ").style(DEFAULT_TEXT_STYLE),
+            Span::from("G").style(KEY_BINDING_STYLE),
+        ]),
+        Line::from(""),
+        Line::from(vec![
+            Span::from("Fuzzy search:         ").style(DEFAULT_TEXT_STYLE),
+            Span::from("/").style(KEY_BINDING_STYLE),
+        ]),
+        Line::from(""),
+        Line::from(vec![
+            Span::from("Help screen:          ").style(DEFAULT_TEXT_STYLE),
+            Span::from("?").style(KEY_BINDING_STYLE),
+        ]),
+        Line::from(""),
+        Line::from(vec![
+            Span::from("Debug logs:           ").style(DEFAULT_TEXT_STYLE),
+            Span::from("L").style(KEY_BINDING_STYLE),
+        ]),
+        Line::from(""),
+        Line::from(vec![
+            Span::from("Quit:                 ").style(DEFAULT_TEXT_STYLE),
+            Span::from("q/Ctrl+c").style(KEY_BINDING_STYLE),
+        ]),
+        Line::from(""),
+        Line::from(vec![
+            Span::from("Launch $H5INSPECT_POST [file] [dataset]: ").style(DEFAULT_TEXT_STYLE),
+            Span::from("i").style(KEY_BINDING_STYLE),
+        ]),
+    ]).wrap(Wrap { trim: true }).scroll((app.help_screen_scroll_state.into(), 0));
 
-    let help_text = Table::new(
-        vec![
-            Row::new([
-                Cell::new(Span::from("Navigate").style(DEFAULT_TEXT_STYLE)),
-                Cell::new(
-                    Text::from("←,↑,→,↓,\nh,j,k,l,\nHome,End,PageUp,PageDown\nclick,scroll")
-                        .style(KEY_BINDING_STYLE),
-                ),
-            ])
-            .height(4),
-            Row::new([
-                Cell::new(Span::from("Close/open group").style(DEFAULT_TEXT_STYLE)),
-                Cell::new(Span::from("Enter/c").style(KEY_BINDING_STYLE)),
-            ]),
-            Row::new([
-                Cell::new(Span::from("Go to top of tree").style(DEFAULT_TEXT_STYLE)),
-                Cell::new(Span::from("g").style(KEY_BINDING_STYLE)),
-            ]),
-            Row::new([
-                Cell::new(Span::from("Go to bottom of tree").style(DEFAULT_TEXT_STYLE)),
-                Cell::new(Span::from("G").style(KEY_BINDING_STYLE)),
-            ]),
-            Row::new([
-                Cell::new(Span::from("Fuzzy search").style(DEFAULT_TEXT_STYLE)),
-                Cell::new(Span::from("/").style(KEY_BINDING_STYLE)),
-            ]),
-            Row::new([
-                Cell::new(Span::from("Help screen").style(DEFAULT_TEXT_STYLE)),
-                Cell::new(Span::from("?").style(KEY_BINDING_STYLE)),
-            ]),
-            Row::new([
-                Cell::new(Span::from("Debug logs").style(DEFAULT_TEXT_STYLE)),
-                Cell::new(Span::from("L").style(KEY_BINDING_STYLE)),
-            ]),
-            Row::new([
-                Cell::new(Span::from("Quit").style(DEFAULT_TEXT_STYLE)),
-                Cell::new(Span::from("q/Ctrl+c").style(KEY_BINDING_STYLE)),
-            ]),
-            Row::new([
-                Cell::new(
-                    Text::from("Launch `$H5INSPECT_POST\n[file] [dataset]`")
-                        .style(DEFAULT_TEXT_STYLE),
-                ),
-                Cell::new(Span::from("i").style(KEY_BINDING_STYLE)),
-            ])
-            .height(2),
-        ],
-        table_widths,
-    );
-    frame.render_widget(help_text, table_area);
+    frame.render_widget(help_paragraph, table_area);
 
 
 }

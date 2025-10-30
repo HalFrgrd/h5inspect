@@ -68,6 +68,7 @@ pub struct App {
     last_help_screen_area: Rect,
     pub animation_state: u8,
     node_id_to_analysis: Arc<Mutex<HashMap<NodeIdT, AsyncDataAnalysis>>>,
+    pub help_screen_scroll_state: u16,
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -222,6 +223,7 @@ impl App {
             last_help_screen_area: Rect::new(0, 0, 0, 0),
             animation_state: 0,
             node_id_to_analysis: Arc::new(Mutex::new(HashMap::new())),
+            help_screen_scroll_state: 0,
         }
     }
 
@@ -611,6 +613,30 @@ impl App {
         };
     }
 
+    fn on_keypress_help_screen_mode(&mut self, keycode: crossterm::event::KeyCode) {
+        match keycode {
+            KeyCode::Up | KeyCode::Char('k') => {
+                self.help_screen_scroll_state = self.help_screen_scroll_state.saturating_sub(1);
+            }
+            KeyCode::Down | KeyCode::Char('j') => {
+                self.help_screen_scroll_state = self.help_screen_scroll_state.saturating_add(1);
+            }
+            KeyCode::PageDown => {
+                self.help_screen_scroll_state = self.help_screen_scroll_state.saturating_add(50);
+            }
+            KeyCode::PageUp => {
+                self.help_screen_scroll_state = self.help_screen_scroll_state.saturating_sub(50);
+            }
+            KeyCode::End => {
+                self.help_screen_scroll_state = u16::MAX;
+            }
+            KeyCode::Home => {
+                self.help_screen_scroll_state = 0;
+            }
+            _ => {}
+        };
+    }
+
     fn update_filtered_tree(&mut self) {
         let query = &self.search_query_and_cursor().0;
         match &self.tree {
@@ -806,7 +832,9 @@ impl App {
                     KeyCode::Esc | KeyCode::Enter | KeyCode::Char('q') | KeyCode::Char('?') => {
                         self.mode = SelectionMode::TreeBrowsing;
                     }
-                    _ => {}
+                    other => {
+                        self.on_keypress_help_screen_mode(other);
+                    }
                 },
             }
         }
