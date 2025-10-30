@@ -845,6 +845,15 @@ impl App {
         match mouse.kind {
             MouseEventKind::Down(MouseButton::Left) => self.on_click(mouse.column, mouse.row),
             MouseEventKind::ScrollDown => {
+                if self.mode == SelectionMode::HelpScreen
+                    && self
+                        .last_help_screen_area
+                        .contains(Position::new(mouse.column, mouse.row))
+                {
+                    self.help_screen_scroll_state = self.help_screen_scroll_state.saturating_add(1);
+                    return;
+                }
+
                 if self
                     .last_object_info_area
                     .contains(Position::new(mouse.column, mouse.row))
@@ -858,6 +867,15 @@ impl App {
                 }
             }
             MouseEventKind::ScrollUp => {
+                if self.mode == SelectionMode::HelpScreen
+                    && self
+                        .last_help_screen_area
+                        .contains(Position::new(mouse.column, mouse.row))
+                {
+                    self.help_screen_scroll_state = self.help_screen_scroll_state.saturating_sub(1);
+                    return;
+                }
+
                 if self
                     .last_object_info_area
                     .contains(Position::new(mouse.column, mouse.row))

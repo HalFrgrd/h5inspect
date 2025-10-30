@@ -4,9 +4,10 @@ use crate::tree;
 
 use num_traits::clamp;
 
+use ratatui::buffer::Buffer;
 use ratatui::layout::Margin;
+use ratatui::prelude::Widget;
 use ratatui::style::Modifier;
-use ratatui::symbols::scrollbar;
 use ratatui::text::{Line, Span, Text};
 use ratatui::{
     layout::{Constraint, Flex, Layout, Position, Rect},
@@ -367,21 +368,21 @@ fn render_help_screen(frame: &mut Frame, app: &mut App, area: Rect) {
     frame.render_widget(Clear, area);
     frame.render_widget(help_block, area);
 
-    let [_, title_area, text_area] = Layout::vertical([
+    let [_, text_area] = Layout::vertical([
         Constraint::Length(3),
-        Constraint::Length(11),
+        // Constraint::Length(11),
         Constraint::Percentage(100),
     ])
     .areas(area.inner(Margin::new(1, 0)));
 
-    let [_, main_title_area, _] = Layout::horizontal([
-        Constraint::Fill(1),
-        Constraint::Min(80),
-        Constraint::Fill(1),
-    ])
-    .areas(title_area);
-    let [main_title_area, version_area] =
-        Layout::vertical([Constraint::Length(7), Constraint::Fill(1)]).areas(main_title_area);
+    // let [_, main_title_area, _] = Layout::horizontal([
+    //     Constraint::Fill(1),
+    //     Constraint::Min(70),
+    //     Constraint::Fill(1),
+    // ])
+    // .areas(title_area);
+    // let [main_title_area, version_area] =
+    //     Layout::vertical([Constraint::Length(7), Constraint::Fill(1)]).areas(main_title_area);
 
     let big_text = BigText::builder()
         .pixel_size(PixelSize::Full)
@@ -389,79 +390,93 @@ fn render_help_screen(frame: &mut Frame, app: &mut App, area: Rect) {
             "h5inspect",
             Style::new().fg(Color::Red).add_modifier(Modifier::BOLD),
         )])
-        .centered()
+        // .centered()
         .build();
 
-    frame.render_widget(big_text, main_title_area);
+    // frame.render_widget(big_text, main_title_area);
 
-    let big_text_version = BigText::builder()
-        .pixel_size(PixelSize::Quadrant)
-        .lines(vec![Line::styled(
-            format!("v{}", env!("CARGO_PKG_VERSION")),
-            Style::new().fg(Color::Red).add_modifier(Modifier::BOLD),
-        )])
-        .right_aligned()
-        .build();
-    frame.render_widget(big_text_version, version_area);
+    // let big_text_version = BigText::builder()
+    //     .pixel_size(PixelSize::Quadrant)
+    //     .lines(vec![Line::styled(
+    //         format!("v{}", env!("CARGO_PKG_VERSION")),
+    //         Style::new().fg(Color::Red).add_modifier(Modifier::BOLD),
+    //     )])
+    //     .right_aligned()
+    //     .build();
+    // frame.render_widget(big_text_version, version_area);
 
     const KEY_BINDING_TITLE_STYLE: Style =
         Style::new().fg(Color::White).add_modifier(Modifier::BOLD);
     const KEY_BINDING_STYLE: Style = Style::new().fg(Color::Yellow);
     const DEFAULT_TEXT_STYLE: Style = Style::new().fg(Color::White);
 
-    let [table_area] = Layout::horizontal([Constraint::Length(70)])
+    let [table_area] = Layout::horizontal([Constraint::Length(80)])
         .flex(Flex::Center)
         .areas(text_area);
+    let big_text_as_lines = widget_to_lines(
+        big_text,
+        Rect::new(0, 0, table_area.width.saturating_sub(1), 10),
+    );
 
-    let mut help_paragraph = Paragraph::new(vec![
-        Line::from(vec![
-            Span::raw("A terminal based HDF5 file inspector. Press "),
-            Span::raw("Esc/q/?").style(KEY_BINDING_STYLE),
-            Span::raw(" to close this help screen."),
-        ]),
-        Line::from("Key bindings")
-            .style(KEY_BINDING_TITLE_STYLE)
-            .centered(),
-        Line::from(vec![
-            Span::from("Navigate:              ").style(DEFAULT_TEXT_STYLE),
-            Span::from("←,↑,→,↓, h,j,k,l, Home,End,PageUp,PageDown, click,scroll").style(KEY_BINDING_STYLE),
-        ]),
-        Line::from(vec![
-            Span::from("Close/open group:      ").style(DEFAULT_TEXT_STYLE),
-            Span::from("Enter/c").style(KEY_BINDING_STYLE),
-        ]),
-        Line::from(vec![
-            Span::from("Go to top of tree:     ").style(DEFAULT_TEXT_STYLE),
-            Span::from("g").style(KEY_BINDING_STYLE),
-        ]),
-        Line::from(vec![
-            Span::from("Go to bottom of tree:  ").style(DEFAULT_TEXT_STYLE),
-            Span::from("G").style(KEY_BINDING_STYLE),
-        ]),
-        Line::from(vec![
-            Span::from("Fuzzy search:         ").style(DEFAULT_TEXT_STYLE),
-            Span::from("/").style(KEY_BINDING_STYLE),
-        ]),
-        Line::from(vec![
-            Span::from("Help screen:           ").style(DEFAULT_TEXT_STYLE),
-            Span::from("?").style(KEY_BINDING_STYLE),
-        ]),
-        Line::from(vec![
-            Span::from("Debug logs:            ").style(DEFAULT_TEXT_STYLE),
-            Span::from("L").style(KEY_BINDING_STYLE),
-        ]),
-        Line::from(vec![
-            Span::from("Quit:                  ").style(DEFAULT_TEXT_STYLE),
-            Span::from("q/Ctrl+c").style(KEY_BINDING_STYLE),
-        ]),
-        Line::from(vec![
-            Span::from("Launch $H5INSPECT_POST [file] [dataset]: ").style(DEFAULT_TEXT_STYLE),
-            Span::from("i").style(KEY_BINDING_STYLE),
-        ]),
-    ]).wrap(Wrap { trim: true });
+    let mut help_lines: Vec<Line> = big_text_as_lines
+        .into_iter()
+        .map(|line| Line::from(line).style(Style::default().fg(Color::Red)))
+        .chain(vec![
+            Line::from(vec![
+                Span::raw("A terminal based HDF5 file inspector. Press "),
+                Span::raw("Esc/q/?").style(KEY_BINDING_STYLE),
+                Span::raw(" to close this help screen."),
+            ]),
+            Line::from("Key bindings")
+                .style(KEY_BINDING_TITLE_STYLE)
+                .centered(),
+            Line::from(vec![
+                Span::from("Navigate:              ").style(DEFAULT_TEXT_STYLE),
+                Span::from("←,↑,→,↓, h,j,k,l, Home,End,PageUp,PageDown, click,scroll")
+                    .style(KEY_BINDING_STYLE),
+            ]),
+            Line::from(vec![
+                Span::from("Close/open group:      ").style(DEFAULT_TEXT_STYLE),
+                Span::from("Enter/c").style(KEY_BINDING_STYLE),
+            ]),
+            Line::from(vec![
+                Span::from("Go to top of tree:     ").style(DEFAULT_TEXT_STYLE),
+                Span::from("g").style(KEY_BINDING_STYLE),
+            ]),
+            Line::from(vec![
+                Span::from("Go to bottom of tree:  ").style(DEFAULT_TEXT_STYLE),
+                Span::from("G").style(KEY_BINDING_STYLE),
+            ]),
+            Line::from(vec![
+                Span::from("Fuzzy search:          ").style(DEFAULT_TEXT_STYLE),
+                Span::from("/").style(KEY_BINDING_STYLE),
+            ]),
+            Line::from(vec![
+                Span::from("Help screen:           ").style(DEFAULT_TEXT_STYLE),
+                Span::from("?").style(KEY_BINDING_STYLE),
+            ]),
+            Line::from(vec![
+                Span::from("Debug logs:            ").style(DEFAULT_TEXT_STYLE),
+                Span::from("L").style(KEY_BINDING_STYLE),
+            ]),
+            Line::from(vec![
+                Span::from("Quit:                  ").style(DEFAULT_TEXT_STYLE),
+                Span::from("q/Ctrl+c").style(KEY_BINDING_STYLE),
+            ]),
+            Line::from(vec![
+                Span::from("Launch $H5INSPECT_POST [file] [dataset]: ").style(DEFAULT_TEXT_STYLE),
+                Span::from("i").style(KEY_BINDING_STYLE),
+            ]),
+        ])
+        .collect();
+
+    let mut help_paragraph = Paragraph::new(help_lines); //.wrap(Wrap { trim: true });
 
     let current_scroll = app.help_screen_scroll_state;
-    let para_length: u16 = help_paragraph.line_count(table_area.width).try_into().unwrap();
+    let para_length: u16 = help_paragraph
+        .line_count(table_area.width)
+        .try_into()
+        .unwrap();
     let viewport_height = table_area.height.saturating_sub(2);
 
     let max_scroll = para_length.saturating_sub(viewport_height);
@@ -485,6 +500,23 @@ fn render_help_screen(frame: &mut Frame, app: &mut App, area: Rect) {
         table_area.inner(Margin::new(0, 1)),
         &mut scrollbar_state,
     );
+}
 
+fn widget_to_lines(widget: BigText, area: Rect) -> Vec<String> {
+    // Create a buffer of the widget's size
+    let mut buf = Buffer::empty(area);
+    widget.render(area, &mut buf);
 
+    // Convert buffer contents to lines
+    let mut lines = Vec::new();
+    for row in area.rows() {
+        let mut line = String::new();
+        for col in row.columns() {
+            if let Some(c) = buf[(col.x, col.y)].symbol().chars().next() {
+                line.push(c);
+            }
+        }
+        lines.push(line);
+    }
+    lines
 }
