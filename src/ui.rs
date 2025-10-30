@@ -351,7 +351,7 @@ fn render_logger(frame: &mut Frame, app: &App, area: Rect) {
 }
 
 fn get_help_screen_area(area: Rect) -> Rect {
-    let vertical = Layout::vertical([Constraint::Length(40)]).flex(Flex::Center);
+    let vertical = Layout::vertical([Constraint::Length(33)]).flex(Flex::Center);
     let horizontal = Layout::horizontal([Constraint::Length(110)]).flex(Flex::Center);
     let [area] = vertical.areas(area);
     let [area] = horizontal.areas(area);
@@ -375,13 +375,6 @@ fn render_help_screen(frame: &mut Frame, app: &mut App, area: Rect) {
     ])
     .areas(area.inner(Margin::new(1, 0)));
 
-    // let [_, main_title_area, _] = Layout::horizontal([
-    //     Constraint::Fill(1),
-    //     Constraint::Min(70),
-    //     Constraint::Fill(1),
-    // ])
-    // .areas(title_area);
-
     const KEY_BINDING_TITLE_STYLE: Style =
         Style::new().fg(Color::White).add_modifier(Modifier::BOLD);
     const KEY_BINDING_STYLE: Style = Style::new().fg(Color::Yellow);
@@ -404,79 +397,91 @@ fn render_help_screen(frame: &mut Frame, app: &mut App, area: Rect) {
         .right_aligned()
         .build();
 
-
-
     let [table_area] = Layout::horizontal([Constraint::Length(80)])
         .flex(Flex::Center)
         .areas(text_area);
 
-
     let big_text_temp_render_area = Rect::new(0, 0, table_area.width.saturating_sub(2), 11);
     let mut buf = Buffer::empty(big_text_temp_render_area);
-    
+
     let [main_title_area, version_area] =
-    Layout::vertical([Constraint::Length(7), Constraint::Fill(1)]).areas(big_text_temp_render_area);
+        Layout::vertical([Constraint::Length(7), Constraint::Fill(1)])
+            .areas(big_text_temp_render_area);
     big_text.render(main_title_area, &mut buf);
 
     big_text_version.render(version_area, &mut buf);
 
     // Convert buffer contents to lines
-    let mut big_text_as_lines = Vec::new();
+    let mut big_text_as_lines: Vec<Line> = Vec::new();
     for row in big_text_temp_render_area.rows() {
-        let mut line = String::new();
+        let mut line: Vec<Span> = Vec::new();
         for col in row.columns() {
-            line.push_str(buf.cell(Position::new(col.x, col.y)).map(|cell| cell.symbol()).unwrap_or(" "));
+            let span = buf
+                .cell(Position::new(col.x, col.y))
+                .map(|cell| cell.symbol())
+                .unwrap_or(" ");
+            let col: f32 = (col.x as f32 - col.y as f32 + app.animation_state as f32).sin();
+            let color = ((col * 0.2 + 0.8) * 255.0) as u8;
+            let color = Color::Rgb(color, 0, 0);
+            line.push(Span::raw(span).style(Style::default().fg(color)));
         }
-        big_text_as_lines.push(line);
+        big_text_as_lines.push(Line::from(line));
     }
 
-    let mut help_lines: Vec<Line> = big_text_as_lines
+    let help_lines: Vec<Line> = big_text_as_lines
         .into_iter()
-        .map(|line| Line::from(line).style(Style::default().fg(Color::Red)))
         .chain(vec![
             Line::from(vec![
                 Span::raw("A terminal based HDF5 file inspector. Press "),
                 Span::raw("Esc/q/?").style(KEY_BINDING_STYLE),
                 Span::raw(" to close this help screen."),
             ]),
+            Line::from(""),
             Line::from("Key bindings")
                 .style(KEY_BINDING_TITLE_STYLE)
                 .centered(),
             Line::from(vec![
-                Span::from("Navigate:              ").style(DEFAULT_TEXT_STYLE),
-                Span::from("←,↑,→,↓, h,j,k,l, Home,End,PageUp,PageDown, click,scroll")
-                    .style(KEY_BINDING_STYLE),
+                Span::from("Navigate:                               ").style(DEFAULT_TEXT_STYLE),
+                Span::from("←,↑,→,↓,h,j,k,l,").style(KEY_BINDING_STYLE),
             ]),
             Line::from(vec![
-                Span::from("Close/open group:      ").style(DEFAULT_TEXT_STYLE),
+                Span::from("                                        ").style(DEFAULT_TEXT_STYLE),
+                Span::from("Home,End,PageUp,PageDown,").style(KEY_BINDING_STYLE),
+            ]),
+            Line::from(vec![
+                Span::from("                                        ").style(DEFAULT_TEXT_STYLE),
+                Span::from("click,scroll").style(KEY_BINDING_STYLE),
+            ]),
+            Line::from(vec![
+                Span::from("Close/open group:                       ").style(DEFAULT_TEXT_STYLE),
                 Span::from("Enter/c").style(KEY_BINDING_STYLE),
             ]),
             Line::from(vec![
-                Span::from("Go to top of tree:     ").style(DEFAULT_TEXT_STYLE),
+                Span::from("Go to top of tree:                      ").style(DEFAULT_TEXT_STYLE),
                 Span::from("g").style(KEY_BINDING_STYLE),
             ]),
             Line::from(vec![
-                Span::from("Go to bottom of tree:  ").style(DEFAULT_TEXT_STYLE),
+                Span::from("Go to bottom of tree:                   ").style(DEFAULT_TEXT_STYLE),
                 Span::from("G").style(KEY_BINDING_STYLE),
             ]),
             Line::from(vec![
-                Span::from("Fuzzy search:          ").style(DEFAULT_TEXT_STYLE),
+                Span::from("Fuzzy search:                           ").style(DEFAULT_TEXT_STYLE),
                 Span::from("/").style(KEY_BINDING_STYLE),
             ]),
             Line::from(vec![
-                Span::from("Help screen:           ").style(DEFAULT_TEXT_STYLE),
+                Span::from("Help screen:                            ").style(DEFAULT_TEXT_STYLE),
                 Span::from("?").style(KEY_BINDING_STYLE),
             ]),
             Line::from(vec![
-                Span::from("Debug logs:            ").style(DEFAULT_TEXT_STYLE),
+                Span::from("Debug logs:                             ").style(DEFAULT_TEXT_STYLE),
                 Span::from("L").style(KEY_BINDING_STYLE),
             ]),
             Line::from(vec![
-                Span::from("Quit:                  ").style(DEFAULT_TEXT_STYLE),
+                Span::from("Quit:                                   ").style(DEFAULT_TEXT_STYLE),
                 Span::from("q/Ctrl+c").style(KEY_BINDING_STYLE),
             ]),
             Line::from(vec![
-                Span::from("Launch $H5INSPECT_POST [file] [dataset]: ").style(DEFAULT_TEXT_STYLE),
+                Span::from("Run `$H5INSPECT_POST [file] [dataset]`: ").style(DEFAULT_TEXT_STYLE),
                 Span::from("i").style(KEY_BINDING_STYLE),
             ]),
         ])
@@ -487,6 +492,7 @@ fn render_help_screen(frame: &mut Frame, app: &mut App, area: Rect) {
     let current_scroll = app.help_screen_scroll_state;
     let para_length: u16 = help_paragraph
         .line_count(table_area.width)
+        .saturating_add(2)
         .try_into()
         .unwrap();
     let viewport_height = table_area.height.saturating_sub(2);
@@ -509,7 +515,7 @@ fn render_help_screen(frame: &mut Frame, app: &mut App, area: Rect) {
             .begin_symbol(Some("╥ "))
             .track_symbol(Some("║"))
             .end_symbol(Some("╨")),
-        table_area.inner(Margin::new(0, 1)),
+        table_area.inner(Margin::new(0, 0)),
         &mut scrollbar_state,
     );
 }

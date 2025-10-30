@@ -306,7 +306,7 @@ impl App {
                             stats_text = vec![(
                                 "Stats".into(),
                                 "Loading".to_owned()
-                                    + &".".repeat((self.animation_state % 4).into()),
+                                    + &".".repeat((self.animation_state / 3 % 4).into()),
                             )]
                         }
                         AsyncDataAnalysis::Ready(val) => match val {
