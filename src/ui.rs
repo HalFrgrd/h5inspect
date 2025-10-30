@@ -381,8 +381,11 @@ fn render_help_screen(frame: &mut Frame, app: &mut App, area: Rect) {
     //     Constraint::Fill(1),
     // ])
     // .areas(title_area);
-    // let [main_title_area, version_area] =
-    //     Layout::vertical([Constraint::Length(7), Constraint::Fill(1)]).areas(main_title_area);
+
+    const KEY_BINDING_TITLE_STYLE: Style =
+        Style::new().fg(Color::White).add_modifier(Modifier::BOLD);
+    const KEY_BINDING_STYLE: Style = Style::new().fg(Color::Yellow);
+    const DEFAULT_TEXT_STYLE: Style = Style::new().fg(Color::White);
 
     let big_text = BigText::builder()
         .pixel_size(PixelSize::Full)
@@ -390,33 +393,42 @@ fn render_help_screen(frame: &mut Frame, app: &mut App, area: Rect) {
             "h5inspect",
             Style::new().fg(Color::Red).add_modifier(Modifier::BOLD),
         )])
-        // .centered()
+        .centered()
+        .build();
+    let big_text_version = BigText::builder()
+        .pixel_size(PixelSize::Quadrant)
+        .lines(vec![Line::styled(
+            format!("v{}", env!("CARGO_PKG_VERSION")),
+            Style::new().fg(Color::Red).add_modifier(Modifier::BOLD),
+        )])
+        .right_aligned()
         .build();
 
-    // frame.render_widget(big_text, main_title_area);
 
-    // let big_text_version = BigText::builder()
-    //     .pixel_size(PixelSize::Quadrant)
-    //     .lines(vec![Line::styled(
-    //         format!("v{}", env!("CARGO_PKG_VERSION")),
-    //         Style::new().fg(Color::Red).add_modifier(Modifier::BOLD),
-    //     )])
-    //     .right_aligned()
-    //     .build();
-    // frame.render_widget(big_text_version, version_area);
-
-    const KEY_BINDING_TITLE_STYLE: Style =
-        Style::new().fg(Color::White).add_modifier(Modifier::BOLD);
-    const KEY_BINDING_STYLE: Style = Style::new().fg(Color::Yellow);
-    const DEFAULT_TEXT_STYLE: Style = Style::new().fg(Color::White);
 
     let [table_area] = Layout::horizontal([Constraint::Length(80)])
         .flex(Flex::Center)
         .areas(text_area);
-    let big_text_as_lines = widget_to_lines(
-        big_text,
-        Rect::new(0, 0, table_area.width.saturating_sub(1), 10),
-    );
+
+
+    let big_text_temp_render_area = Rect::new(0, 0, table_area.width.saturating_sub(2), 11);
+    let mut buf = Buffer::empty(big_text_temp_render_area);
+    
+    let [main_title_area, version_area] =
+    Layout::vertical([Constraint::Length(7), Constraint::Fill(1)]).areas(big_text_temp_render_area);
+    big_text.render(main_title_area, &mut buf);
+
+    big_text_version.render(version_area, &mut buf);
+
+    // Convert buffer contents to lines
+    let mut big_text_as_lines = Vec::new();
+    for row in big_text_temp_render_area.rows() {
+        let mut line = String::new();
+        for col in row.columns() {
+            line.push_str(buf.cell(Position::new(col.x, col.y)).map(|cell| cell.symbol()).unwrap_or(" "));
+        }
+        big_text_as_lines.push(line);
+    }
 
     let mut help_lines: Vec<Line> = big_text_as_lines
         .into_iter()
@@ -470,7 +482,7 @@ fn render_help_screen(frame: &mut Frame, app: &mut App, area: Rect) {
         ])
         .collect();
 
-    let mut help_paragraph = Paragraph::new(help_lines); //.wrap(Wrap { trim: true });
+    let mut help_paragraph = Paragraph::new(help_lines).wrap(Wrap { trim: false });
 
     let current_scroll = app.help_screen_scroll_state;
     let para_length: u16 = help_paragraph
@@ -500,23 +512,4 @@ fn render_help_screen(frame: &mut Frame, app: &mut App, area: Rect) {
         table_area.inner(Margin::new(0, 1)),
         &mut scrollbar_state,
     );
-}
-
-fn widget_to_lines(widget: BigText, area: Rect) -> Vec<String> {
-    // Create a buffer of the widget's size
-    let mut buf = Buffer::empty(area);
-    widget.render(area, &mut buf);
-
-    // Convert buffer contents to lines
-    let mut lines = Vec::new();
-    for row in area.rows() {
-        let mut line = String::new();
-        for col in row.columns() {
-            if let Some(c) = buf[(col.x, col.y)].symbol().chars().next() {
-                line.push(c);
-            }
-        }
-        lines.push(line);
-    }
-    lines
 }
