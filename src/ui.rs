@@ -12,7 +12,7 @@ use ratatui::{
     style::{Color, Style},
     widgets::{
         Block, BorderType, Borders, Cell, Clear, Paragraph, Row, Scrollbar, ScrollbarOrientation,
-        ScrollbarState, Table, TableState,
+        ScrollbarState, Table, TableState, Wrap,
     },
     Frame,
 };
@@ -137,7 +137,7 @@ fn render_object_info(frame: &mut Frame, app: &mut App, area: Rect) {
 
     let object_info = Block::new()
         .title("Object info")
-        .title_top(Line::from("Help screen ('?')").right_aligned())
+        .title_top(Line::from("Help screen (type '?')").right_aligned())
         .title_bottom(
             Line::from(format!("# background analysis tasks: {}", num_active_tasks))
                 .left_aligned()
@@ -235,7 +235,7 @@ fn render_object_info(frame: &mut Frame, app: &mut App, area: Rect) {
 
 fn render_search(frame: &mut Frame, app: &mut App, area: Rect) {
     let search_block = Block::new()
-        .title("Fuzzy search ('/')")
+        .title("Fuzzy search (type '/')")
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
         .border_style(if app.mode == SelectionMode::SearchQueryEditing {
@@ -410,24 +410,28 @@ fn render_help_screen(frame: &mut Frame, _app: &App, area: Rect) {
 
     let table_widths = [Constraint::Length(24), Constraint::Length(30)];
 
-    let [table_area] = Layout::horizontal([Constraint::Length(54)])
+    let [table_area] = Layout::horizontal([Constraint::Length(70)])
         .flex(Flex::Center)
         .areas(text_area);
     let [top_of_table_area, table_area, bottom_of_table_area] = Layout::vertical([
         Constraint::Length(3),
         Constraint::Length(13),
-        Constraint::Length(5),
+        Constraint::Length(2),
     ])
     .flex(Flex::Center)
     .areas(table_area);
 
     let top_of_table_text = Paragraph::new(vec![
-        Line::from("A terminal based HDF5 file inspector."),
+        Line::from(vec![
+            Span::raw("A terminal based HDF5 file inspector. Press "),
+            Span::raw("Esc/q/?").style(KEY_BINDING_STYLE),
+            Span::raw(" to close this help screen."),
+        ]),
         Line::from(""),
         Line::from("Key bindings")
             .style(KEY_BINDING_TITLE_STYLE)
             .centered(),
-    ]);
+    ]).wrap(Wrap { trim: true });
     frame.render_widget(top_of_table_text, top_of_table_area);
 
     let help_text = Table::new(
@@ -481,13 +485,5 @@ fn render_help_screen(frame: &mut Frame, _app: &App, area: Rect) {
     );
     frame.render_widget(help_text, table_area);
 
-    let bottom_of_table_text = Paragraph::new(vec![
-        Line::from(""),
-        Line::from(vec![
-            Span::raw("Press "),
-            Span::raw("Esc/q/?").style(KEY_BINDING_STYLE),
-            Span::raw(" to close this help screen."),
-        ]),
-    ]);
-    frame.render_widget(bottom_of_table_text, bottom_of_table_area);
+
 }
