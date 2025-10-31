@@ -22,6 +22,7 @@ use tui_big_text::{BigText, PixelSize};
 use tui_logger;
 use tui_tree_widget::Tree as WidgetTreeRoot;
 use tui_tree_widget::TreeItem as WidgetTreeItem;
+use std::ops::Mul;
 
 pub const MAGENTA_R: u8 = 0xfc;
 pub const MAGENTA_G: u8 = 0x4c;
@@ -420,8 +421,8 @@ fn render_help_screen(frame: &mut Frame, app: &mut App, area: Rect) {
                 .cell(Position::new(col.x, col.y))
                 .map(|cell| cell.symbol())
                 .unwrap_or(" ");
-            let col: f32 = (col.x as f32 - col.y as f32 + app.animation_state as f32).sin();
-            let color = ((col * 0.2 + 0.8) * 255.0) as u8;
+            let col: f32 = (col.x as f32 - col.y as f32 + app.animation_state as f32).mul(0.3).sin();
+            let color = ((col * 0.3 + 1.0) * 255.0).min(255.0) as u8;
             let color = Color::Rgb(color, 0, 0);
             line.push(Span::raw(span).style(Style::default().fg(color)));
         }
