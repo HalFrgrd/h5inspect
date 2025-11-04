@@ -107,7 +107,7 @@ fn get_text_for_dataset(tree_node: &TreeNode<NodeIdT>) -> Vec<(String, String)> 
     let compression_info = format!("Filter pipeline: {:?}", compression);
 
     // Get storage size vs data size
-    let storage_size = 0; // dataset.storage_size();
+    let storage_size = dataset.storage_size();
     let data_size = dataset.size() * dataset.dtype().map_or(0, |dt| dt.size());
     let data_size: u64 = data_size.try_into().unwrap_or(0);
     let compression_ratio = if storage_size > 0 {
