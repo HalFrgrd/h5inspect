@@ -443,10 +443,13 @@ pub fn generate_large_file() -> Result<()> {
     // Dataset 1: 8GB of f32 data (2D array)
     let rows1 = 32768; // 2^15
     let cols1 = 65536; // 2^16
-    // Total elements: 32768 * 65536 = 2,147,483,648 elements
-    // Size: 2,147,483,648 * 4 bytes = 8GB
+                       // Total elements: 32768 * 65536 = 2,147,483,648 elements
+                       // Size: 2,147,483,648 * 4 bytes = 8GB
 
-    println!("Creating first dataset: {}x{} f32 array (~8GB)", rows1, cols1);
+    println!(
+        "Creating first dataset: {}x{} f32 array (~8GB)",
+        rows1, cols1
+    );
 
     let ds1 = file
         .new_dataset::<f32>()
@@ -475,7 +478,7 @@ pub fn generate_large_file() -> Result<()> {
 
     // Dataset 2: 8GB of i64 data (1D array)
     let len2 = 1_073_741_824; // 2^30 elements
-    // Size: 1,073,741,824 * 8 bytes = 8GB
+                              // Size: 1,073,741,824 * 8 bytes = 8GB
 
     println!("Creating second dataset: {} i64 elements (~8GB)", len2);
 

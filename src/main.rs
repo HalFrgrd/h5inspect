@@ -47,14 +47,14 @@ fn main() -> Result<(), Box<dyn Error>> {
     if matches.get_flag("analyze") {
         let h5_file_name: &String = matches.get_one("h5file").expect("h5file is required");
         let dataset_path: Option<&String> = matches.get_one("dataset");
-        
+
         if dataset_path.is_none() {
             eprintln!("Error: --analyze requires a dataset path as the second argument");
             std::process::exit(1);
         }
-        
+
         let dataset_path = dataset_path.unwrap();
-        
+
         // Run analysis and output JSON
         match analysis::hdf5_dataset_analysis_from_path(h5_file_name, dataset_path) {
             Ok(result) => {

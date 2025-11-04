@@ -23,7 +23,6 @@ use std::vec;
 use tokio;
 use tokio::sync::Semaphore;
 
-
 #[derive(Debug, Clone)]
 pub enum Hdf5Object {
     Group(hdf5::Group),
@@ -72,6 +71,7 @@ pub struct App {
     node_id_to_analysis: Arc<Mutex<HashMap<NodeIdT, AsyncDataAnalysis>>>,
     pub help_screen_scroll_state: u16,
     process_semaphore: Arc<Semaphore>,
+    pub last_time_had_analysis_tasks: Option<std::time::Instant>,
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -190,7 +190,7 @@ fn get_text_for_group(tree_node: &TreeNode<NodeIdT>) -> Vec<(String, String)> {
 }
 
 impl App {
-    const NUM_ANALYSIS_PERMITS: usize = 100;
+    const NUM_ANALYSIS_PERMITS: usize = 64;
 
     pub fn new(h5_file_path: PathBuf) -> App {
         let mut starting_mode = SelectionMode::HelpScreen;
@@ -230,6 +230,7 @@ impl App {
             node_id_to_analysis: Arc::new(Mutex::new(HashMap::new())),
             help_screen_scroll_state: 0,
             process_semaphore: Arc::new(Semaphore::new(App::NUM_ANALYSIS_PERMITS)), // Limit to NUM_ANALYSIS_PERMITS concurrent processes
+            last_time_had_analysis_tasks: None,
         }
     }
 
@@ -725,7 +726,6 @@ impl App {
                     // already being processed or done
                     return;
                 }
-                
                 info_dict.insert(key.clone(), AsyncDataAnalysis::Loading);
             }
 
@@ -745,7 +745,10 @@ impl App {
             tokio::spawn(async move {
                 // Acquire semaphore permit to limit concurrent processes
                 // This will wait until a permit becomes available
-                let _permit = semaphore.acquire().await.expect("Semaphore should not be closed");
+                let _permit = semaphore
+                    .acquire()
+                    .await
+                    .expect("Semaphore should not be closed");
 
                 log::debug!("Spawning analysis process for dataset {}", &dataset_path);
                 let result = tokio::process::Command::new(std::env::current_exe().unwrap())
@@ -762,16 +765,21 @@ impl App {
                             // Parse the JSON output from the analysis process
                             match serde_json::from_slice::<AnalysisResult>(&output.stdout) {
                                 Ok(analysis) => analysis,
-                                Err(e) => AnalysisResult::Failed(format!("Failed to parse analysis result: {}", e))
+                                Err(e) => AnalysisResult::Failed(format!(
+                                    "Failed to parse analysis result: {}",
+                                    e
+                                )),
                             }
                         } else {
                             let stderr = String::from_utf8_lossy(&output.stderr);
                             AnalysisResult::Failed(format!("Analysis process failed: {}", stderr))
                         }
                     }
-                    Err(e) => AnalysisResult::Failed(format!("Failed to spawn analysis process: {}", e))
+                    Err(e) => {
+                        AnalysisResult::Failed(format!("Failed to spawn analysis process: {}", e))
+                    }
                 };
-            
+
                 if let Ok(mut info_dict) = thread_arc.lock() {
                     info_dict.insert(key, AsyncDataAnalysis::Ready(processed_analysis));
                 }

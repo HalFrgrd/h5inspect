@@ -18,11 +18,11 @@ use ratatui::{
     },
     Frame,
 };
+use std::ops::Mul;
 use tui_big_text::{BigText, PixelSize};
 use tui_logger;
 use tui_tree_widget::Tree as WidgetTreeRoot;
 use tui_tree_widget::TreeItem as WidgetTreeItem;
-use std::ops::Mul;
 
 pub const MAGENTA_R: u8 = 0xfc;
 pub const MAGENTA_G: u8 = 0x4c;
@@ -136,20 +136,33 @@ where
 }
 
 fn render_object_info(frame: &mut Frame, app: &mut App, area: Rect) {
-    let num_active_tasks = app.get_num_active_data_analysis_tasks();
-    let (processes_in_use, total_process_limit) = app.get_process_semaphore_info();
-
     let object_info = Block::new()
         .title("Object info")
         .title_top(Line::from("Help screen (type '?')").right_aligned())
-        .title_bottom(
-            Line::from(format!(
-                "Analysis tasks: {} | Processes: {}/{}",
-                num_active_tasks, processes_in_use, total_process_limit
-            ))
+        .title_bottom({
+            let num_active_tasks = app.get_num_active_data_analysis_tasks();
+            let (processes_in_use, total_process_limit) = app.get_process_semaphore_info();
+
+            if num_active_tasks > 0 {
+                app.last_time_had_analysis_tasks = Some(std::time::Instant::now());
+            }
+
+            if num_active_tasks > 0
+                || app
+                    .last_time_had_analysis_tasks
+                    .map(|t| t.elapsed().as_secs() < 1)
+                    .unwrap_or(false)
+            {
+                Line::from(format!(
+                    "Analysis tasks: {} | Processes: {}/{}",
+                    num_active_tasks, processes_in_use, total_process_limit
+                ))
                 .left_aligned()
-                .style(get_style(Styles::DefaultText, app.mode).add_modifier(Modifier::DIM)),
-        )
+                .style(get_style(Styles::DefaultText, app.mode).add_modifier(Modifier::DIM))
+            } else {
+                Line::from("").left_aligned()
+            }
+        })
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
         .border_style(if app.mode == SelectionMode::ObjectInfoInspecting {
@@ -425,7 +438,9 @@ fn render_help_screen(frame: &mut Frame, app: &mut App, area: Rect) {
                 .cell(Position::new(col.x, col.y))
                 .map(|cell| cell.symbol())
                 .unwrap_or(" ");
-            let col: f32 = (col.x as f32 - col.y as f32 + app.animation_state as f32).mul(0.3).sin();
+            let col: f32 = (col.x as f32 - col.y as f32 + app.animation_state as f32)
+                .mul(0.3)
+                .sin();
             let color = ((col * 0.3 + 1.0) * 255.0).min(255.0) as u8;
             let color = Color::Rgb(color, 0, 0);
             line.push(Span::raw(span).style(Style::default().fg(color)));

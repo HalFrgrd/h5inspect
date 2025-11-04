@@ -90,25 +90,25 @@ where
     info.push(("Data preview".to_owned(), format!("{}", v)));
 
     let hist = compute_histogram(&arr_f64).ok();
-    
+
     Ok(AnalysisResult::Stats(info, hist))
 }
 
 pub fn hdf5_dataset_analysis_from_path(
-    file_path: &str, 
-    dataset_path: &str
+    file_path: &str,
+    dataset_path: &str,
 ) -> Result<AnalysisResult, Box<dyn Error>> {
-
-    std::thread::sleep(std::time::Duration::from_secs(10));
-    
     let file = hdf5::File::open(file_path)?;
     let dataset = file.dataset(dataset_path)?;
     let d = Arc::new(dataset);
-    
+
     let dtype = d.dtype()?;
     if d.ndim() != 1 || d.size() == 0 {
-        log::info!("Dataset is not 1D or is empty: ndim: {}, size: {}", 
-                   d.ndim(), d.size());
+        log::info!(
+            "Dataset is not 1D or is empty: ndim: {}, size: {}",
+            d.ndim(),
+            d.size()
+        );
         return Ok(AnalysisResult::NotAvailable);
     }
 
@@ -138,6 +138,6 @@ pub fn hdf5_dataset_analysis_from_path(
     } else {
         Ok(AnalysisResult::NotAvailable)
     };
-    
+
     result
 }
