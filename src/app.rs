@@ -21,7 +21,7 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::vec;
 use tokio;
-use std::thread;
+use tokio::sync::Semaphore;
 
 
 #[derive(Debug, Clone)]
@@ -71,6 +71,7 @@ pub struct App {
     pub animation_state: u8,
     node_id_to_analysis: Arc<Mutex<HashMap<NodeIdT, AsyncDataAnalysis>>>,
     pub help_screen_scroll_state: u16,
+    process_semaphore: Arc<Semaphore>,
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -189,6 +190,8 @@ fn get_text_for_group(tree_node: &TreeNode<NodeIdT>) -> Vec<(String, String)> {
 }
 
 impl App {
+    const NUM_ANALYSIS_PERMITS: usize = 100;
+
     pub fn new(h5_file_path: PathBuf) -> App {
         let mut starting_mode = SelectionMode::HelpScreen;
 
@@ -226,6 +229,7 @@ impl App {
             animation_state: 0,
             node_id_to_analysis: Arc::new(Mutex::new(HashMap::new())),
             help_screen_scroll_state: 0,
+            process_semaphore: Arc::new(Semaphore::new(App::NUM_ANALYSIS_PERMITS)), // Limit to NUM_ANALYSIS_PERMITS concurrent processes
         }
     }
 
@@ -270,6 +274,12 @@ impl App {
             .values()
             .filter(|&v| matches!(v, AsyncDataAnalysis::Loading))
             .count()
+    }
+
+    pub fn get_process_semaphore_info(&self) -> (usize, usize) {
+        let available = self.process_semaphore.available_permits();
+        let in_use = App::NUM_ANALYSIS_PERMITS - available;
+        (in_use, App::NUM_ANALYSIS_PERMITS)
     }
 
     pub fn get_text_for(
@@ -721,24 +731,30 @@ impl App {
 
             let thread_arc: Arc<Mutex<HashMap<NodeIdT, AsyncDataAnalysis>>> =
                 Arc::clone(&self.node_id_to_analysis);
-            log::debug!("asdf");
+            let semaphore = Arc::clone(&self.process_semaphore);
 
             // Get the file path and dataset path to pass to the worker process
             let file_path = self.h5_file_path.to_string_lossy().to_string();
             let dataset_path = d.name().to_string();
-            let thread_id = thread::current().id();
-            log::debug!("spawning analysis process on thread {:?} for dataset {:?}", thread_id, dataset_path);
 
             // Spawn analysis in a completely separate process
+            // Ideally it would just happpen in a separate thread, but the hdf5 read operation uses a processs wide lock
+            // so when we want to read basic stats of the dataset, or another dataset at the same time, we are forced to wait
+            // ideally the hdf5 library would support finer grained locking, but until then we have to do this workaround.
+            // Even if I open the file anew in the new thread, we still get blocked by the process wide lock.
             tokio::spawn(async move {
-                log::debug!("Starting analysis process for dataset {:?}", dataset_path);
-                
+                // Acquire semaphore permit to limit concurrent processes
+                // This will wait until a permit becomes available
+                let _permit = semaphore.acquire().await.expect("Semaphore should not be closed");
+
+                log::debug!("Spawning analysis process for dataset {}", &dataset_path);
                 let result = tokio::process::Command::new(std::env::current_exe().unwrap())
                     .arg("--analyze")
                     .arg(&file_path)
                     .arg(&dataset_path)
                     .output()
                     .await;
+                log::debug!("Analysis process for dataset {} finished", &dataset_path);
 
                 let processed_analysis = match result {
                     Ok(output) => {
@@ -755,15 +771,13 @@ impl App {
                     }
                     Err(e) => AnalysisResult::Failed(format!("Failed to spawn analysis process: {}", e))
                 };
-                
-                log::debug!("Finished analysis process for dataset {:?}", dataset_path);
-
+            
                 if let Ok(mut info_dict) = thread_arc.lock() {
                     info_dict.insert(key, AsyncDataAnalysis::Ready(processed_analysis));
                 }
+
+                // The permit is automatically dropped here, releasing the semaphore slot
             });
-            let thread_id = thread::current().id();
-            log::debug!("after spawn process on thread {:?}", thread_id);
         }
     }
 

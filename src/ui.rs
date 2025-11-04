@@ -137,12 +137,16 @@ where
 
 fn render_object_info(frame: &mut Frame, app: &mut App, area: Rect) {
     let num_active_tasks = app.get_num_active_data_analysis_tasks();
+    let (processes_in_use, total_process_limit) = app.get_process_semaphore_info();
 
     let object_info = Block::new()
         .title("Object info")
         .title_top(Line::from("Help screen (type '?')").right_aligned())
         .title_bottom(
-            Line::from(format!("# background analysis tasks: {}", num_active_tasks))
+            Line::from(format!(
+                "Analysis tasks: {} | Processes: {}/{}",
+                num_active_tasks, processes_in_use, total_process_limit
+            ))
                 .left_aligned()
                 .style(get_style(Styles::DefaultText, app.mode).add_modifier(Modifier::DIM)),
         )

@@ -10,7 +10,6 @@ use serde::{Deserialize, Serialize};
 use std::error::Error;
 use std::fmt::Display;
 use std::sync::Arc;
-use std::thread;
 use std::vec;
 
 pub type HistogramData = Vec<(f32, u32)>;
@@ -63,8 +62,6 @@ where
 {
     let mut info: Vec<(String, String)> = Vec::new();
 
-    log::info!("Thread {:?}: Reading dataset data...", thread::current().id());
-    thread::sleep(std::time::Duration::from_millis(1000)); // Simulate some delay
     let v: Array1<T> = d.read_1d()?;
 
     let sum: T::AccumulatorType = v.iter().fold(T::AccumulatorType::zero(), |acc, x| {
@@ -101,23 +98,21 @@ pub fn hdf5_dataset_analysis_from_path(
     file_path: &str, 
     dataset_path: &str
 ) -> Result<AnalysisResult, Box<dyn Error>> {
-    let thread_id = thread::current().id();
-    log::info!("Starting analysis on thread {:?} for dataset: {} in file: {}", 
-               thread_id, dataset_path, file_path);
+
+    std::thread::sleep(std::time::Duration::from_secs(10));
     
-    // Open the file fresh in this thread
     let file = hdf5::File::open(file_path)?;
     let dataset = file.dataset(dataset_path)?;
     let d = Arc::new(dataset);
     
     let dtype = d.dtype()?;
     if d.ndim() != 1 || d.size() == 0 {
-        log::info!("Thread {:?}: Dataset is not 1D or is empty: ndim: {}, size: {}", 
-                   thread_id, d.ndim(), d.size());
+        log::info!("Dataset is not 1D or is empty: ndim: {}, size: {}", 
+                   d.ndim(), d.size());
         return Ok(AnalysisResult::NotAvailable);
     }
 
-    log::info!("Thread {:?}: Dataset dtype: {:?}", thread_id, dtype.to_descriptor());
+    log::info!("Dataset dtype: {:?}", dtype.to_descriptor());
     let result = if dtype.is::<f32>() {
         analysis_1d::<f32>(d)
     } else if dtype.is::<f64>() {
@@ -144,6 +139,5 @@ pub fn hdf5_dataset_analysis_from_path(
         Ok(AnalysisResult::NotAvailable)
     };
     
-    log::info!("Thread {:?}: Completed analysis for dataset: {}", thread_id, dataset_path);
     result
 }
