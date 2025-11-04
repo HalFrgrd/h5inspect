@@ -141,7 +141,6 @@ fn render_object_info(frame: &mut Frame, app: &mut App, area: Rect) {
         .title_top(Line::from("Help screen (type '?')").right_aligned())
         .title_bottom({
             let num_active_tasks = app.get_num_active_data_analysis_tasks();
-            let (processes_in_use, total_process_limit) = app.get_process_semaphore_info();
 
             if num_active_tasks > 0 {
                 app.last_time_had_analysis_tasks = Some(std::time::Instant::now());
@@ -154,8 +153,9 @@ fn render_object_info(frame: &mut Frame, app: &mut App, area: Rect) {
                     .unwrap_or(false)
             {
                 Line::from(format!(
-                    "Analysis tasks: {} | Processes: {}/{}",
-                    num_active_tasks, processes_in_use, total_process_limit
+                    "Analysis tasks: {}/{}",
+                    num_active_tasks,
+                    App::NUM_ANALYSIS_PERMITS
                 ))
                 .left_aligned()
                 .style(get_style(Styles::DefaultText, app.mode).add_modifier(Modifier::DIM))

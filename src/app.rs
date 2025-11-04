@@ -190,7 +190,7 @@ fn get_text_for_group(tree_node: &TreeNode<NodeIdT>) -> Vec<(String, String)> {
 }
 
 impl App {
-    const NUM_ANALYSIS_PERMITS: usize = 64;
+    pub const NUM_ANALYSIS_PERMITS: usize = 64;
 
     pub fn new(h5_file_path: PathBuf) -> App {
         let mut starting_mode = SelectionMode::HelpScreen;
@@ -275,12 +275,6 @@ impl App {
             .values()
             .filter(|&v| matches!(v, AsyncDataAnalysis::Loading))
             .count()
-    }
-
-    pub fn get_process_semaphore_info(&self) -> (usize, usize) {
-        let available = self.process_semaphore.available_permits();
-        let in_use = App::NUM_ANALYSIS_PERMITS - available;
-        (in_use, App::NUM_ANALYSIS_PERMITS)
     }
 
     pub fn get_text_for(
