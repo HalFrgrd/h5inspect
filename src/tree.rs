@@ -218,7 +218,7 @@ mod tests {
     #[test]
     fn test_path_to_first_match_no_match() {
         let tree = TreeNode::<i32>::new_with_indices(0, "root", vec![], vec![], false);
-        assert_eq!(tree.path_to_first_match(), vec![]);
+        assert_eq!(tree.path_to_first_match(), Vec::<i32>::new());
     }
 
     #[test]

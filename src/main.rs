@@ -1,6 +1,7 @@
 use crate::app::App;
 use clap;
 use color_eyre::Result;
+use serde_json;
 use std::error::Error;
 
 use ratatui;
@@ -27,8 +28,48 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .value_hint(clap::ValueHint::FilePath)
                 .required(true),
         )
+        .arg(
+            clap::Arg::new("analyze")
+                .long("analyze")
+                .help("Run analysis on a specific dataset and output JSON result")
+                .action(clap::ArgAction::SetTrue),
+        )
+        .arg(
+            clap::Arg::new("dataset")
+                .value_name("DATASET")
+                .help("Dataset path to analyze (required when using --analyze)")
+                .required(false),
+        )
         .version(env!("CARGO_PKG_VERSION"))
         .get_matches();
+
+    // Check if we're in analysis mode
+    if matches.get_flag("analyze") {
+        let h5_file_name: &String = matches.get_one("h5file").expect("h5file is required");
+        let dataset_path: Option<&String> = matches.get_one("dataset");
+        
+        if dataset_path.is_none() {
+            eprintln!("Error: --analyze requires a dataset path as the second argument");
+            std::process::exit(1);
+        }
+        
+        let dataset_path = dataset_path.unwrap();
+        
+        // Run analysis and output JSON
+        match analysis::hdf5_dataset_analysis_from_path(h5_file_name, dataset_path) {
+            Ok(result) => {
+                let json_output = serde_json::to_string(&result)?;
+                println!("{}", json_output);
+                return Ok(());
+            }
+            Err(e) => {
+                let error_result = analysis::AnalysisResult::Failed(e.to_string());
+                let json_output = serde_json::to_string(&error_result)?;
+                println!("{}", json_output);
+                std::process::exit(1);
+            }
+        }
+    }
 
     let h5_file_name: &String = matches.get_one("h5file").expect("h5file is required");
     let h5_file_path = std::path::PathBuf::from(h5_file_name);
@@ -73,6 +114,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 fn build_runtime() -> tokio::runtime::Runtime {
     tokio::runtime::Builder::new_multi_thread()
         .worker_threads(2)
+        .max_blocking_threads(512)
         .enable_all()
         .build()
         .unwrap()

@@ -21,6 +21,8 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::vec;
 use tokio;
+use std::thread;
+
 
 #[derive(Debug, Clone)]
 pub enum Hdf5Object {
@@ -104,7 +106,7 @@ fn get_text_for_dataset(tree_node: &TreeNode<NodeIdT>) -> Vec<(String, String)> 
     let compression_info = format!("Filter pipeline: {:?}", compression);
 
     // Get storage size vs data size
-    let storage_size = dataset.storage_size();
+    let storage_size = 0; // dataset.storage_size();
     let data_size = dataset.size() * dataset.dtype().map_or(0, |dt| dt.size());
     let data_size: u64 = data_size.try_into().unwrap_or(0);
     let compression_ratio = if storage_size > 0 {
@@ -706,27 +708,62 @@ impl App {
 
     fn start_analysis_task(&self, tree_node: &TreeNode<NodeIdT>) {
         if let Some(Hdf5Object::Dataset(d)) = &tree_node.hdf5_object {
-            let mut info_dict = self.node_id_to_analysis.lock().unwrap();
             let key = tree_node.id().clone();
-            if info_dict.get(&key).is_some() {
-                // already being processed or done
-                return;
+            {
+                let mut info_dict = self.node_id_to_analysis.lock().unwrap();
+                if info_dict.get(&key).is_some() {
+                    // already being processed or done
+                    return;
+                }
+                
+                info_dict.insert(key.clone(), AsyncDataAnalysis::Loading);
             }
-
-            info_dict.insert(key.clone(), AsyncDataAnalysis::Loading);
 
             let thread_arc: Arc<Mutex<HashMap<NodeIdT, AsyncDataAnalysis>>> =
                 Arc::clone(&self.node_id_to_analysis);
-            let d = Arc::clone(d);
-            tokio::task::spawn_blocking(move || {
-                let analysis = analysis::hdf5_dataset_analysis(d);
+            log::debug!("asdf");
 
-                let processed_analysis =
-                    analysis.unwrap_or_else(|s| AnalysisResult::Failed(s.to_string()));
+            // Get the file path and dataset path to pass to the worker process
+            let file_path = self.h5_file_path.to_string_lossy().to_string();
+            let dataset_path = d.name().to_string();
+            let thread_id = thread::current().id();
+            log::debug!("spawning analysis process on thread {:?} for dataset {:?}", thread_id, dataset_path);
 
-                let mut info_dict = thread_arc.lock().unwrap();
-                info_dict.insert(key, AsyncDataAnalysis::Ready(processed_analysis));
+            // Spawn analysis in a completely separate process
+            tokio::spawn(async move {
+                log::debug!("Starting analysis process for dataset {:?}", dataset_path);
+                
+                let result = tokio::process::Command::new(std::env::current_exe().unwrap())
+                    .arg("--analyze")
+                    .arg(&file_path)
+                    .arg(&dataset_path)
+                    .output()
+                    .await;
+
+                let processed_analysis = match result {
+                    Ok(output) => {
+                        if output.status.success() {
+                            // Parse the JSON output from the analysis process
+                            match serde_json::from_slice::<AnalysisResult>(&output.stdout) {
+                                Ok(analysis) => analysis,
+                                Err(e) => AnalysisResult::Failed(format!("Failed to parse analysis result: {}", e))
+                            }
+                        } else {
+                            let stderr = String::from_utf8_lossy(&output.stderr);
+                            AnalysisResult::Failed(format!("Analysis process failed: {}", stderr))
+                        }
+                    }
+                    Err(e) => AnalysisResult::Failed(format!("Failed to spawn analysis process: {}", e))
+                };
+                
+                log::debug!("Finished analysis process for dataset {:?}", dataset_path);
+
+                if let Ok(mut info_dict) = thread_arc.lock() {
+                    info_dict.insert(key, AsyncDataAnalysis::Ready(processed_analysis));
+                }
             });
+            let thread_id = thread::current().id();
+            log::debug!("after spawn process on thread {:?}", thread_id);
         }
     }
 
@@ -739,7 +776,7 @@ impl App {
         let mut events = events::EventHandler::new();
 
         // Spawn a task to load the HDF5 file structure since it might be slow
-        tokio::spawn(async move {
+        tokio::task::spawn_blocking(move || {
             let tree = App::tree_from_h5(&h5_file).expect("Failed to parse HDF5 structure");
             let tree_update = events::Event::TreeUpdate(tree);
             events.sender.clone().send(tree_update).unwrap();
@@ -759,11 +796,6 @@ impl App {
                         .get_selected_node(path_to_selected_node)
                     {
                         self.start_analysis_task(tree_node);
-                        // if let Some(Hdf5Object::Dataset(dataset)) =
-                        //     &tree_node.hdf5_object
-                        // {
-                        //     last_path = dataset.name().to_string();
-                        // }
                     }
                 }
             }

@@ -19,7 +19,7 @@ duplicate = "2.0.0"
 futures = "0.3.31"
 fuzzy-matcher = "0.3.7"
 hdf5-metno = { version = "0.10.1", features = ["blosc-all", "complex", "f16", "zlib"] }
-hdf5-metno-sys = "0.10.0"
+hdf5-metno-sys = {version = "0.10.0", features = ["threadsafe"]}
 log = "0.4.22"
 ndarray = "0.16.1"
 ndarray-stats = "0.6.0"
@@ -28,6 +28,8 @@ numfmt = "1.2.0"
 plotters = {version = "0.3.7", default-features = false, features = ["all_elements", "all_series"]}
 plotters-ratatui-backend = "0.3.0"
 rand = "0.9.2"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
 tui-big-text = "0.7.1"
 tui-logger = "0.17.4"
 tui-tree-widget = "0.23.0"

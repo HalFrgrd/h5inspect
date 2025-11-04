@@ -73,7 +73,7 @@ pub fn ui(frame: &mut Frame, app: &mut App) {
     render_tree(frame, app, left_layout[0]);
 
     let right_layout =
-        Layout::vertical([Constraint::Percentage(85), Constraint::Min(0)]).split(chunks[1]);
+        Layout::vertical([Constraint::Percentage(50), Constraint::Min(0)]).split(chunks[1]);
 
     let object_info_area = if app.show_logs {
         right_layout[0]

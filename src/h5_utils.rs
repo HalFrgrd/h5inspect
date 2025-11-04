@@ -429,3 +429,88 @@ pub fn open_file(file_path: &PathBuf) -> Result<hdf5::File> {
     }
     Err("Couldn't open file".into())
 }
+
+#[allow(dead_code)]
+pub fn generate_large_file() -> Result<()> {
+    let file = File::create("dummy_large.h5")?;
+
+    // Calculate dimensions for ~8GB datasets
+    // For f32 (4 bytes): 8GB = 8 * 1024^3 bytes = 2,147,483,648 elements
+    // For i64 (8 bytes): 8GB = 8 * 1024^3 bytes = 1,073,741,824 elements
+
+    println!("Creating dummy_large.h5 with two 8GB datasets...");
+
+    // Dataset 1: 8GB of f32 data (2D array)
+    let rows1 = 32768; // 2^15
+    let cols1 = 65536; // 2^16
+    // Total elements: 32768 * 65536 = 2,147,483,648 elements
+    // Size: 2,147,483,648 * 4 bytes = 8GB
+
+    println!("Creating first dataset: {}x{} f32 array (~8GB)", rows1, cols1);
+
+    let ds1 = file
+        .new_dataset::<f32>()
+        .chunk((1024, 1024)) // Use reasonable chunk size
+        .shape((rows1, cols1))
+        .deflate(1) // Light compression to save some space
+        .create("large_float_dataset")?;
+
+    // Write data in chunks to avoid memory issues
+    let chunk_rows = 1024;
+    for start_row in (0..rows1).step_by(chunk_rows) {
+        let end_row = (start_row + chunk_rows).min(rows1);
+        let chunk_height = end_row - start_row;
+
+        let chunk_data = Array2::from_shape_fn((chunk_height, cols1), |(i, j)| {
+            // Generate some pattern so it's not all zeros
+            ((start_row + i) as f32 * 0.001 + j as f32 * 0.0001).sin()
+        });
+
+        ds1.write_slice(&chunk_data, (start_row..end_row, ..))?;
+
+        if start_row % (chunk_rows * 10) == 0 {
+            println!("Written {}/{} rows for first dataset", start_row, rows1);
+        }
+    }
+
+    // Dataset 2: 8GB of i64 data (1D array)
+    let len2 = 1_073_741_824; // 2^30 elements
+    // Size: 1,073,741,824 * 8 bytes = 8GB
+
+    println!("Creating second dataset: {} i64 elements (~8GB)", len2);
+
+    let ds2 = file
+        .new_dataset::<i64>()
+        .chunk(1048576) // 1M elements per chunk
+        .shape(len2)
+        .deflate(1) // Light compression
+        .create("large_int_dataset")?;
+
+    // Write data in chunks
+    let chunk_size = 1_048_576; // 1M elements
+    for start in (0..len2).step_by(chunk_size) {
+        let end = (start + chunk_size).min(len2);
+        let chunk_len = end - start;
+
+        let chunk_data: Vec<i64> = (0..chunk_len)
+            .map(|i| {
+                // Generate some pattern: mix of large and small numbers
+                let idx = start + i;
+                if idx % 1000 == 0 {
+                    idx as i64 * 1_000_000_000 // Large numbers occasionally
+                } else {
+                    (idx as i64).wrapping_mul(31).wrapping_add(17) // Simple pattern
+                }
+            })
+            .collect();
+
+        ds2.write_slice(&chunk_data, start..end)?;
+
+        if start % (chunk_size * 100) == 0 {
+            println!("Written {}/{} elements for second dataset", start, len2);
+        }
+    }
+
+    println!("Successfully created dummy6.h5 with two ~8GB datasets");
+    Ok(())
+}
