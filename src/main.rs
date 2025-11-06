@@ -43,9 +43,11 @@ fn main() -> Result<(), Box<dyn Error>> {
         .version(env!("CARGO_PKG_VERSION"))
         .get_matches();
 
+    let h5_file_name: &String = matches.get_one("h5file").expect("h5file is required");
+    let h5_file_path = std::path::PathBuf::from(h5_file_name);
+
     // Check if we're in analysis mode
     if matches.get_flag("analyze") {
-        let h5_file_name: &String = matches.get_one("h5file").expect("h5file is required");
         let dataset_path: Option<&String> = matches.get_one("dataset");
 
         if dataset_path.is_none() {
@@ -56,7 +58,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         let dataset_path = dataset_path.unwrap();
 
         // Run analysis and output JSON
-        match analysis::hdf5_dataset_analysis_from_path(h5_file_name, dataset_path) {
+        match analysis::hdf5_dataset_analysis_from_path(&h5_file_path, dataset_path) {
             Ok(result) => {
                 let json_output = serde_json::to_string(&result)?;
                 println!("{}", json_output);
@@ -71,8 +73,6 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     }
 
-    let h5_file_name: &String = matches.get_one("h5file").expect("h5file is required");
-    let h5_file_path = std::path::PathBuf::from(h5_file_name);
     tui_logger::init_logger(log::LevelFilter::Trace)?;
     tui_logger::set_default_level(log::LevelFilter::Trace);
     tui_logger::set_level_for_target("plotters_ratatui_backend::widget", log::LevelFilter::Off);

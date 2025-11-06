@@ -215,7 +215,21 @@ impl Pixel {
 #[allow(dead_code)]
 pub fn generate_dummy_file() -> Result<()> {
     let file = File::create("dummy.h5")?;
+    generate_dummy_core(&file)
+}
 
+#[allow(dead_code)]
+pub fn generate_dummy_split_file() -> Result<()> {
+    // Create a split file - data and metadata stored separately
+    let file = File::with_options()
+        .with_fapl(|p| p.split_options("-m.h5", "-r.h5"))
+        .create("dummy_split.h5")?;
+
+    generate_dummy_core(&file)
+}
+
+#[allow(dead_code)]
+pub fn generate_dummy_core(file: &File) -> Result<()> {
     // Seeded RNG for reproducibility
     let mut rng = StdRng::seed_from_u64(42);
     let bernoulli = Bernoulli::new(0.5).unwrap(); // Bernoulli distribution with p=0.5
@@ -356,35 +370,6 @@ pub fn generate_dummy_file() -> Result<()> {
             .create(format!("dataset_{}", i).as_str())?;
         dataset.write(&arr)?;
     }
-
-    Ok(())
-}
-
-#[allow(dead_code)]
-pub fn generate_dummy_split_file() -> Result<()> {
-    use hdf5::File;
-    use ndarray::Array2;
-
-    let nx = 10;
-    let ny = 8;
-    let arr: Array2<i32> = Array2::from_shape_fn((ny, nx), |(i, j)| (i * nx + j) as i32);
-
-    // Create a split file - data and metadata stored separately
-    let file = File::with_options()
-        .with_fapl(|p| p.split_options("-m.h5", "-r.h5"))
-        .create("dummy_split.h5")?;
-
-    // Create a dataset
-    let ds = file.new_dataset::<i32>().shape((ny, nx)).create("data")?;
-    ds.write(&arr)?;
-
-    // Create some groups and datasets
-    let group = file.create_group("group1")?;
-    let ds2 = group
-        .new_dataset::<i32>()
-        .shape((ny, nx))
-        .create("nested_data")?;
-    ds2.write(&arr)?;
 
     Ok(())
 }

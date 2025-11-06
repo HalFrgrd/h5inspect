@@ -1,3 +1,4 @@
+use crate::h5_utils;
 use crate::num_utils::{IsNan, MyToPrimitive, Summable};
 use core::f64;
 use dtoa;
@@ -9,6 +10,7 @@ use num_traits::{self, ToPrimitive, Zero};
 use serde::{Deserialize, Serialize};
 use std::error::Error;
 use std::fmt::Display;
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::vec;
 
@@ -95,10 +97,10 @@ where
 }
 
 pub fn hdf5_dataset_analysis_from_path(
-    file_path: &str,
+    file_path: &PathBuf,
     dataset_path: &str,
 ) -> Result<AnalysisResult, Box<dyn Error>> {
-    let file = hdf5::File::open(file_path)?;
+    let file = h5_utils::open_file(file_path)?;
     let dataset = file.dataset(dataset_path)?;
     let d = Arc::new(dataset);
 

@@ -220,7 +220,7 @@ impl App {
             search_query_right: String::new(),
             search_query_view_offset: 0,
             mode: starting_mode,
-            show_logs: cfg!(debug_assertions),
+            show_logs: false, //cfg!(debug_assertions),
             object_info_scroll_state: 0,
             last_object_info_area: Rect::new(0, 0, 0, 0),
             last_tree_area: Rect::new(0, 0, 0, 0),
