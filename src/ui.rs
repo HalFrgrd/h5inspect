@@ -2,7 +2,6 @@ use crate::app::{App, SelectionMode};
 use crate::hist_plot;
 use crate::tree;
 
-use color_eyre::owo_colors::OwoColorize;
 use num_traits::clamp;
 
 use ratatui::buffer::Buffer;
