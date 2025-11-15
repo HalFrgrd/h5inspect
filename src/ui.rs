@@ -2,6 +2,7 @@ use crate::app::{App, SelectionMode};
 use crate::hist_plot;
 use crate::tree;
 
+use color_eyre::owo_colors::OwoColorize;
 use num_traits::clamp;
 
 use ratatui::buffer::Buffer;
@@ -501,7 +502,13 @@ fn render_help_screen(frame: &mut Frame, app: &mut App, area: Rect) {
                 Span::from("q/Ctrl+c").style(KEY_BINDING_STYLE),
             ]),
             Line::from(vec![
-                Span::from("Run `$H5INSPECT_POST [file] [dataset]`: ").style(DEFAULT_TEXT_STYLE),
+                Span::from("Run ").style(DEFAULT_TEXT_STYLE),
+                Span::from("$H5INSPECT_POST [file] [dataset]").style(
+                    Style::new()
+                        .fg(ratatui::style::palette::material::BLUE_GRAY.c200)
+                        .add_modifier(Modifier::BOLD),
+                ),
+                Span::from(":   ").style(DEFAULT_TEXT_STYLE),
                 Span::from("i").style(KEY_BINDING_STYLE),
             ]),
         ])

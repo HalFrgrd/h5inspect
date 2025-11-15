@@ -55,7 +55,9 @@ impl EventHandler {
                                         last_scroll_time = Some(Instant::now());
                                         sender_clone.send(Event::Mouse(mouse)).unwrap();
                                     }
-                                } else {
+                                } else if mouse.kind != crossterm::event::MouseEventKind::Moved {
+                                    // Ignore mouse move events to reduce event spam
+                                    // drag events are still sent through
                                     sender_clone.send(Event::Mouse(mouse)).unwrap();
                                 }
                             }

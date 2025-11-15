@@ -228,8 +228,7 @@ pub fn generate_dummy_split_file() -> Result<()> {
     generate_dummy_core(&file)
 }
 
-#[allow(dead_code)]
-pub fn generate_dummy_core(file: &File) -> Result<()> {
+fn generate_dummy_core(file: &File) -> Result<()> {
     // Seeded RNG for reproducibility
     let mut rng = StdRng::seed_from_u64(42);
     let bernoulli = Bernoulli::new(0.5).unwrap(); // Bernoulli distribution with p=0.5

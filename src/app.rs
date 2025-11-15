@@ -889,7 +889,7 @@ impl App {
     }
 
     fn handle_mouse(&mut self, mouse: crossterm::event::MouseEvent) {
-        // log::debug!("mouse event: {:?}", mouse);
+        log::debug!("mouse event: {:?}", mouse);
         match mouse.kind {
             MouseEventKind::Down(MouseButton::Left) => self.on_click(mouse.column, mouse.row),
             MouseEventKind::ScrollDown => {
