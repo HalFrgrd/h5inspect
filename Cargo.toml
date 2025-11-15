@@ -6,7 +6,7 @@ description = "A terminal based HDF5 file inspector"
 repository = "https://github.com/HalFrgrd/h5inspect"
 license-file = "LICENSE"
 readme = "README.md"
-keywords = ["hdf5", "inspector", "terminal", "tui", "viewer", "cli"]
+keywords = ["hdf5", "terminal", "tui", "viewer", "cli"]
 categories = ["command-line-utilities", "science", "visualization"]
 exclude = ["vhs/**"]
 
