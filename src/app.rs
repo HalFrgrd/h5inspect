@@ -89,9 +89,12 @@ fn get_text_for_dataset(tree_node: &TreeNode<NodeIdT>) -> Vec<(String, String)> 
     };
 
     let shape = dataset.shape();
-    // let datatype = dataset.dtyp;e().map(get_datatype_string).unwrap_or("unknown".to_string());
-    let datatype: String =
-        h5_utils::type_descriptor_to_text(dataset.dtype().unwrap().to_descriptor().unwrap());
+    let datatype: String = dataset
+        .dtype()
+        .and_then(|dt| dt.to_descriptor())
+        .map(|desc| h5_utils::type_descriptor_to_text(desc))
+        .unwrap_or("unknown".to_string());
+
     let space = dataset
         .space()
         .map(|s| format!("{:?}", s))
