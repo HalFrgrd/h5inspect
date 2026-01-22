@@ -1,4 +1,5 @@
-/target
+target/**
 *.h5
 *-r.h5
 *-m.h5
+*.logw

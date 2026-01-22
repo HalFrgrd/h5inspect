@@ -3,6 +3,8 @@ use clap;
 use color_eyre::Result;
 use serde_json;
 use std::error::Error;
+use std::fs::OpenOptions;
+use std::io::Write;
 
 use ratatui;
 use tui_logger;
@@ -40,6 +42,14 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .help("Dataset path to analyze (required when using --analyze)")
                 .required(false),
         )
+        .arg(
+            clap::Arg::new("logs")
+                .long("logs")
+                .value_name("FILE")
+                .help("Path to a file where logs will be appended")
+                .value_hint(clap::ValueHint::FilePath)
+                .required(false),
+        )
         .version(env!("CARGO_PKG_VERSION"))
         .get_matches();
 
@@ -73,10 +83,21 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     }
 
+    // Initialize tui_logger as the main logger
     tui_logger::init_logger(log::LevelFilter::Trace)?;
     tui_logger::set_default_level(log::LevelFilter::Trace);
     tui_logger::set_level_for_target("plotters_ratatui_backend::widget", log::LevelFilter::Off);
     tui_logger::set_level_for_target("mio::poll", log::LevelFilter::Off);
+    
+    // Set up file logging if --logs argument is provided
+     if let Some(log_file_path) = matches.get_one::<String>("logs") {
+
+        // Set up tui_logger to also output to file via custom dispatch
+        // We'll use the tui_logger's built-in move_events functionality
+        tui_logger::set_log_file(tui_logger::TuiLoggerFile::new(log_file_path));
+        
+    }
+    
     log::info!("Starting app");
 
     let app = App::new(h5_file_path);
