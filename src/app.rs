@@ -7,6 +7,7 @@ use crate::tree::TreeNode;
 use crate::ui::ui;
 use crossterm::event::{MouseButton, MouseEventKind};
 use hdf5_metno as hdf5;
+use std::time::Instant;
 
 use chrono::{DateTime, Local};
 use core::panic;
@@ -74,6 +75,7 @@ pub struct App {
     pub last_time_had_analysis_tasks: Option<std::time::Instant>,
     pub tree_width_percentage: u16,
     pub is_dragging_divider: bool,
+    last_redraw_from_scroll: Instant,
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -238,6 +240,7 @@ impl App {
             last_time_had_analysis_tasks: None,
             tree_width_percentage: 50,
             is_dragging_divider: false,
+            last_redraw_from_scroll: Instant::now(),
         }
     }
 
@@ -813,6 +816,7 @@ impl App {
             events.sender.clone().send(tree_update).unwrap();
         });
 
+        let mut redraw = true;
         while self.running == AppFinishingState::Continue {
             if let Some(last_selected) = &self.tree_state_last_rendered_selected {
                 if last_selected != self.tree_state.selected() {
@@ -830,21 +834,28 @@ impl App {
                     }
                 }
             }
-            terminal.draw(|frame| ui(frame, &mut self))?;
-            self.tree_state_last_rendered_selected = Some(self.tree_state.selected().to_vec());
+            if redraw {
+                terminal.draw(|frame| ui(frame, &mut self))?;
+                self.tree_state_last_rendered_selected = Some(self.tree_state.selected().to_vec());
+            }
 
             if let Some(event) = events.receiver.recv().await {
-                match event {
+                redraw = match event {
                     events::Event::AnimationTick => {
                         self.animation_state = self.animation_state.wrapping_add(1);
+                        true
                     }
-                    events::Event::Key(key) => self.handle_keypress(key),
+                    events::Event::Key(key) => {
+                        self.handle_keypress(key);
+                        true
+                    }
                     events::Event::Mouse(mouse) => self.handle_mouse(mouse),
-                    events::Event::Resize => {}
+                    events::Event::Resize => true,
                     events::Event::TreeUpdate(tree) => {
                         self.tree = Some(tree);
                         self.open_all_tree_nodes();
                         self.update_filtered_tree();
+                        true
                     }
                 }
             }
@@ -903,13 +914,17 @@ impl App {
         }
     }
 
-    fn handle_mouse(&mut self, mouse: crossterm::event::MouseEvent) {
+    fn handle_mouse(&mut self, mouse: crossterm::event::MouseEvent) -> bool {
         log::debug!("mouse event: {:?}", mouse);
         match mouse.kind {
-            MouseEventKind::Down(MouseButton::Left) => self.on_click(mouse.column, mouse.row),
+            MouseEventKind::Down(MouseButton::Left) => {
+                self.on_click(mouse.column, mouse.row);
+                true
+            }
             MouseEventKind::Up(MouseButton::Left) => {
                 // Stop dragging when mouse button is released
                 self.is_dragging_divider = false;
+                true
             }
             MouseEventKind::Drag(MouseButton::Left) => {
                 if self.is_dragging_divider {
@@ -924,52 +939,57 @@ impl App {
                         self.tree_width_percentage = new_percentage.clamp(10, 90);
                     }
                 }
+                true
             }
-            MouseEventKind::ScrollDown => {
+            MouseEventKind::ScrollDown | MouseEventKind::ScrollUp => {
+                let is_scroll_down = matches!(mouse.kind, MouseEventKind::ScrollDown);
+
                 if self.mode == SelectionMode::HelpScreen
                     && self
                         .last_help_screen_area
                         .contains(Position::new(mouse.column, mouse.row))
                 {
-                    self.help_screen_scroll_state = self.help_screen_scroll_state.saturating_add(1);
-                    return;
+                    if is_scroll_down {
+                        self.help_screen_scroll_state =
+                            self.help_screen_scroll_state.saturating_add(1);
+                    } else {
+                        self.help_screen_scroll_state =
+                            self.help_screen_scroll_state.saturating_sub(1);
+                    }
+                    return true;
                 }
 
                 if self
                     .last_object_info_area
                     .contains(Position::new(mouse.column, mouse.row))
                 {
-                    self.object_info_scroll_state = self.object_info_scroll_state.saturating_add(1);
+                    if is_scroll_down {
+                        self.object_info_scroll_state =
+                            self.object_info_scroll_state.saturating_add(1);
+                    } else {
+                        self.object_info_scroll_state =
+                            self.object_info_scroll_state.saturating_sub(1);
+                    }
                 } else if self
                     .last_tree_area
                     .contains(Position::new(mouse.column, mouse.row))
                 {
-                    self.tree_state.scroll_down(1);
-                }
-            }
-            MouseEventKind::ScrollUp => {
-                if self.mode == SelectionMode::HelpScreen
-                    && self
-                        .last_help_screen_area
-                        .contains(Position::new(mouse.column, mouse.row))
-                {
-                    self.help_screen_scroll_state = self.help_screen_scroll_state.saturating_sub(1);
-                    return;
+                    if is_scroll_down {
+                        self.tree_state.scroll_down(1);
+                    } else {
+                        self.tree_state.scroll_up(1);
+                    }
                 }
 
-                if self
-                    .last_object_info_area
-                    .contains(Position::new(mouse.column, mouse.row))
-                {
-                    self.object_info_scroll_state = self.object_info_scroll_state.saturating_sub(1);
-                } else if self
-                    .last_tree_area
-                    .contains(Position::new(mouse.column, mouse.row))
-                {
-                    self.tree_state.scroll_up(1);
+                const SCROLL_COOLDOWN_MS: u128 = 40;
+                if self.last_redraw_from_scroll.elapsed().as_millis() > SCROLL_COOLDOWN_MS {
+                    self.last_redraw_from_scroll = Instant::now();
+                    true
+                } else {
+                    false
                 }
             }
-            _ => {}
+            _ => false,
         }
     }
 }

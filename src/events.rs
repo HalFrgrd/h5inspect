@@ -2,7 +2,6 @@ use std::time::Duration;
 
 use crossterm::event::{Event as CrosstermEvent, KeyEvent, MouseEvent};
 use futures::{FutureExt, StreamExt};
-use std::time::Instant;
 
 use crate::app::NodeIdT;
 use crate::tree::TreeNode;
@@ -26,16 +25,13 @@ pub struct EventHandler {
 
 impl EventHandler {
     pub fn new() -> Self {
-        let tick_rate = Duration::from_millis(100);
         let (sender, receiver) = tokio::sync::mpsc::unbounded_channel();
         let sender_clone = sender.clone();
         let handler = tokio::spawn(async move {
             let mut reader = crossterm::event::EventStream::new();
-            let mut tick = tokio::time::interval(tick_rate);
-            const SCROLL_COOLDOWN_MS: u128 = 10;
-            let mut last_scroll_time: Option<Instant> = None;
+            let mut animation_tick = tokio::time::interval(Duration::from_millis(100));
             loop {
-                let tick_delay = tick.tick();
+                let tick_delay = animation_tick.tick();
                 let crossterm_event = reader.next().fuse();
                 tokio::select! {
                     _ = sender_clone.closed() => break,
@@ -50,12 +46,7 @@ impl EventHandler {
                                 }
                             }
                             CrosstermEvent::Mouse(mouse) => {
-                                if mouse.kind == crossterm::event::MouseEventKind::ScrollDown || mouse.kind == crossterm::event::MouseEventKind::ScrollUp {
-                                    if last_scroll_time.is_none() || last_scroll_time.unwrap().elapsed().as_millis() > SCROLL_COOLDOWN_MS {
-                                        last_scroll_time = Some(Instant::now());
-                                        sender_clone.send(Event::Mouse(mouse)).unwrap();
-                                    }
-                                } else if mouse.kind != crossterm::event::MouseEventKind::Moved {
+                                if mouse.kind != crossterm::event::MouseEventKind::Moved {
                                     // Ignore mouse move events to reduce event spam
                                     // drag events are still sent through
                                     sender_clone.send(Event::Mouse(mouse)).unwrap();
