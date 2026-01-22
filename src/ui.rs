@@ -63,8 +63,11 @@ fn get_style(style: Styles, mode: SelectionMode) -> Style {
 }
 
 pub fn ui(frame: &mut Frame, app: &mut App) {
-    let chunks =
-        Layout::horizontal([Constraint::Percentage(40), Constraint::Min(0)]).split(frame.area());
+    let chunks = Layout::horizontal([
+        Constraint::Percentage(app.tree_width_percentage),
+        Constraint::Min(0),
+    ])
+    .split(frame.area());
 
     let left_layout =
         Layout::vertical([Constraint::Min(0), Constraint::Length(3)]).split(chunks[0]);

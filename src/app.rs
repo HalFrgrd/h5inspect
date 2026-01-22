@@ -72,6 +72,8 @@ pub struct App {
     pub help_screen_scroll_state: u16,
     process_semaphore: Arc<Semaphore>,
     pub last_time_had_analysis_tasks: Option<std::time::Instant>,
+    pub tree_width_percentage: u16,
+    pub is_dragging_divider: bool,
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -234,6 +236,8 @@ impl App {
             help_screen_scroll_state: 0,
             process_semaphore: Arc::new(Semaphore::new(App::NUM_ANALYSIS_PERMITS)), // Limit to NUM_ANALYSIS_PERMITS concurrent processes
             last_time_had_analysis_tasks: None,
+            tree_width_percentage: 50,
+            is_dragging_divider: false,
         }
     }
 
@@ -379,6 +383,14 @@ impl App {
         log::debug!("clicked at {:?}", position);
 
         if self.mode == SelectionMode::HelpScreen && self.last_help_screen_area.contains(position) {
+            return;
+        }
+
+        // Check if clicking on the divider between tree and object info
+        // The divider is at the right edge of the tree area or left edge of object info area
+        let divider_column = self.last_tree_area.right();
+        if column == divider_column || column == divider_column.saturating_sub(1) {
+            self.is_dragging_divider = true;
             return;
         }
 
@@ -895,6 +907,24 @@ impl App {
         log::debug!("mouse event: {:?}", mouse);
         match mouse.kind {
             MouseEventKind::Down(MouseButton::Left) => self.on_click(mouse.column, mouse.row),
+            MouseEventKind::Up(MouseButton::Left) => {
+                // Stop dragging when mouse button is released
+                self.is_dragging_divider = false;
+            }
+            MouseEventKind::Drag(MouseButton::Left) => {
+                if self.is_dragging_divider {
+                    // Calculate the new tree width percentage based on mouse position
+                    // Get the total width of the terminal
+                    let total_width = self.last_tree_area.width + self.last_object_info_area.width;
+                    if total_width > 0 {
+                        // Calculate percentage based on mouse column position
+                        let new_percentage =
+                            ((mouse.column as u32 * 100) / total_width as u32) as u16;
+                        // Clamp between 10% and 90% to keep both panels usable
+                        self.tree_width_percentage = new_percentage.clamp(10, 90);
+                    }
+                }
+            }
             MouseEventKind::ScrollDown => {
                 if self.mode == SelectionMode::HelpScreen
                     && self
