@@ -749,8 +749,8 @@ impl App {
 
                 log::debug!("Spawning analysis process for dataset {}", &dataset_path);
                 let result = tokio::process::Command::new(std::env::current_exe().unwrap())
-                    .arg("--analyze")
                     .arg(&file_path)
+                    .arg("--analyze-dataset")
                     .arg(&dataset_path)
                     .output()
                     .await;

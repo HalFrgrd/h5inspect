@@ -1,12 +1,10 @@
 use crate::app::App;
 use clap;
 use color_eyre::Result;
+use ratatui;
 use serde_json;
 use std::error::Error;
-use std::fs::OpenOptions;
-use std::io::Write;
-
-use ratatui;
+use std::path::PathBuf;
 use tui_logger;
 
 mod analysis;
@@ -31,22 +29,17 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .required(true),
         )
         .arg(
-            clap::Arg::new("analyze")
-                .long("analyze")
-                .help("Run analysis on a specific dataset and output JSON result")
-                .action(clap::ArgAction::SetTrue),
-        )
-        .arg(
-            clap::Arg::new("dataset")
+            clap::Arg::new("analyze-dataset")
+                .long("analyze-dataset")
                 .value_name("DATASET")
-                .help("Dataset path to analyze (required when using --analyze)")
+                .help("Run analysis on a specific dataset and output JSON result")
                 .required(false),
         )
         .arg(
             clap::Arg::new("logs")
                 .long("logs")
                 .value_name("FILE")
-                .help("Path to a file where logs will be appended")
+                .help("File path to print logs to")
                 .value_hint(clap::ValueHint::FilePath)
                 .required(false),
         )
@@ -56,80 +49,79 @@ fn main() -> Result<(), Box<dyn Error>> {
     let h5_file_name: &String = matches.get_one("h5file").expect("h5file is required");
     let h5_file_path = std::path::PathBuf::from(h5_file_name);
 
+    initialize_logger(matches.get_one::<String>("logs"))?;
+
     // Check if we're in analysis mode
-    if matches.get_flag("analyze") {
-        let dataset_path: Option<&String> = matches.get_one("dataset");
-
-        if dataset_path.is_none() {
-            eprintln!("Error: --analyze requires a dataset path as the second argument");
-            std::process::exit(1);
-        }
-
-        let dataset_path = dataset_path.unwrap();
-
+    if let Some(dataset_path) = matches.get_one::<String>("analyze-dataset") {
         // Run analysis and output JSON
-        match analysis::hdf5_dataset_analysis_from_path(&h5_file_path, dataset_path) {
-            Ok(result) => {
-                let json_output = serde_json::to_string(&result)?;
-                println!("{}", json_output);
-                return Ok(());
-            }
-            Err(e) => {
-                let error_result = analysis::AnalysisResult::Failed(e.to_string());
-                let json_output = serde_json::to_string(&error_result)?;
-                println!("{}", json_output);
-                std::process::exit(1);
+        analyze_dataset(&h5_file_path, dataset_path)
+    } else {
+        log::info!("Starting app");
+
+        let app = App::new(h5_file_path);
+        let runtime = build_runtime();
+
+        color_eyre::install()?;
+        let terminal = ratatui::init();
+        crossterm::execute!(std::io::stdout(), crossterm::event::EnableMouseCapture)?;
+        let res = runtime.block_on(app.run(terminal));
+        crossterm::execute!(std::io::stdout(), crossterm::event::DisableMouseCapture)?;
+        ratatui::restore();
+
+        if let Ok(ref finishing_state) = res {
+            if let app::AppFinishingState::ShouldRunCommand(post_cmd, ds_path) = finishing_state {
+                println!(
+                    "H5INSPECT_POST running: {} {} {}",
+                    post_cmd, h5_file_name, ds_path
+                );
+                let mut child = std::process::Command::new(post_cmd)
+                    .arg(h5_file_name)
+                    .arg(ds_path)
+                    .stdin(std::process::Stdio::inherit())
+                    .stdout(std::process::Stdio::inherit())
+                    .stderr(std::process::Stdio::inherit())
+                    .spawn()?;
+                let status = child.wait()?;
+                if !status.success() {
+                    eprintln!("H5INSPECT_POST script exited with status: {}", status);
+                }
             }
         }
+        res.map(|_| ())
     }
+}
 
+fn initialize_logger(log_file_path: Option<&String>) -> Result<(), Box<dyn Error>> {
     // Initialize tui_logger as the main logger
     tui_logger::init_logger(log::LevelFilter::Trace)?;
     tui_logger::set_default_level(log::LevelFilter::Trace);
     tui_logger::set_level_for_target("plotters_ratatui_backend::widget", log::LevelFilter::Off);
     tui_logger::set_level_for_target("mio::poll", log::LevelFilter::Off);
-    
-    // Set up file logging if --logs argument is provided
-     if let Some(log_file_path) = matches.get_one::<String>("logs") {
 
+    // Set up file logging if --logs argument is provided
+    if let Some(log_file_path) = log_file_path {
         // Set up tui_logger to also output to file via custom dispatch
         // We'll use the tui_logger's built-in move_events functionality
         tui_logger::set_log_file(tui_logger::TuiLoggerFile::new(log_file_path));
-        
     }
-    
-    log::info!("Starting app");
+    Ok(())
+}
 
-    let app = App::new(h5_file_path);
-    let runtime = build_runtime();
-
-    color_eyre::install()?;
-    let terminal = ratatui::init();
-    crossterm::execute!(std::io::stdout(), crossterm::event::EnableMouseCapture)?;
-    let res = runtime.block_on(app.run(terminal));
-    crossterm::execute!(std::io::stdout(), crossterm::event::DisableMouseCapture)?;
-    ratatui::restore();
-
-    if let Ok(ref finishing_state) = res {
-        if let app::AppFinishingState::ShouldRunCommand(post_cmd, ds_path) = finishing_state {
-            println!(
-                "H5INSPECT_POST running: {} {} {}",
-                post_cmd, h5_file_name, ds_path
-            );
-            let mut child = std::process::Command::new(post_cmd)
-                .arg(h5_file_name)
-                .arg(ds_path)
-                .stdin(std::process::Stdio::inherit())
-                .stdout(std::process::Stdio::inherit())
-                .stderr(std::process::Stdio::inherit())
-                .spawn()?;
-            let status = child.wait()?;
-            if !status.success() {
-                eprintln!("H5INSPECT_POST script exited with status: {}", status);
-            }
+fn analyze_dataset(h5_file_path: &PathBuf, dataset_path: &str) -> Result<(), Box<dyn Error>> {
+    // Run analysis and output JSON
+    match analysis::hdf5_dataset_analysis_from_path(&h5_file_path, dataset_path) {
+        Ok(result) => {
+            let json_output = serde_json::to_string(&result)?;
+            println!("{}", json_output);
+            return Ok(());
+        }
+        Err(e) => {
+            let error_result = analysis::AnalysisResult::Failed(e.to_string());
+            let json_output = serde_json::to_string(&error_result)?;
+            println!("{}", json_output);
+            std::process::exit(1);
         }
     }
-    res.map(|_| ())
 }
 
 fn build_runtime() -> tokio::runtime::Runtime {
