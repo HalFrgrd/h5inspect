@@ -26,7 +26,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .value_name("FILE")
                 .help("Name of hdf5 file to inspect")
                 .value_hint(clap::ValueHint::FilePath)
-                .required(true),
+                .required(false),
         )
         .arg(
             clap::Arg::new("analyze-dataset")
@@ -43,16 +43,31 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .value_hint(clap::ValueHint::FilePath)
                 .required(false),
         )
+        .arg(
+            clap::Arg::new("generate-dummy-file")
+                .long("generate-dummy-file")
+                .help("Generate a dummy hdf5 file for testing purposes")
+                .action(clap::ArgAction::SetTrue),
+        )
         .version(env!("CARGO_PKG_VERSION"))
         .get_matches();
 
-    let h5_file_name: &String = matches.get_one("h5file").expect("h5file is required");
+    // Handle generate-dummy-file flag first (doesn't require h5file)
+    if matches.get_flag("generate-dummy-file") {
+        h5_utils::generate_dummy_file()?;
+        return Ok(());
+    }
+
+    // For all other operations, h5file is required
+    let h5_file_name: &String = matches
+        .get_one("h5file")
+        .expect("h5file is required unless using --generate-dummy-file");
     let h5_file_path = std::path::PathBuf::from(h5_file_name);
 
     initialize_logger(matches.get_one::<String>("logs"))?;
 
-    // Check if we're in analysis mode
     if let Some(dataset_path) = matches.get_one::<String>("analyze-dataset") {
+        // Check if we're in analysis mode
         // Run analysis and output JSON
         analyze_dataset(&h5_file_path, dataset_path)
     } else {
