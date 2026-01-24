@@ -14,9 +14,13 @@ h5inspect is a modern, interactive terminal application designed to make explori
 - Mouse support
 - Fuzzy search
 - Data visualization
-- External analysis scripts can be launched on the selected dataset by setting `H5INSPECT_POST`
+- [Launch external analysis scripts](../README.md)
 
 ## Installation
 HDF5 can be built from source and linked statically with the `static` flag.
 Without the `static` flag, `hdf5-metno` requires the `HDF5_DIR` environment variable to find an existing installation.
 See [hdf5-metno](https://crates.io/crates/hdf5-metno) for more information.
+
+```bash
+cargo install h5inspect --features static
+```
