@@ -1,5 +1,5 @@
 # h5inspect_post
-When you press `i` in h5inspect, the app will quit launch `$H5INSPECT_POST [file] [dataset]`.
+When you press `i` in h5inspect, the app will quit and launch `$H5INSPECT_POST [file] [dataset]`.
 An example script is provided:
 
 ```python

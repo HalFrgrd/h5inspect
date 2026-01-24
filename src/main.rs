@@ -90,7 +90,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // For all other operations, h5file is required
     let h5_file_name: &String = matches
         .get_one("h5file")
-        .expect("h5file is required unless using --generate-dummy-file");
+        .expect("clap should have enforced presence of h5file argument");
     let h5_file_path = std::path::PathBuf::from(h5_file_name);
 
     initialize_logger(matches.get_one::<String>("logs"))?;
