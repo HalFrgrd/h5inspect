@@ -508,6 +508,7 @@ fn render_help_screen(frame: &mut Frame, app: &mut App, area: Rect) {
                 Span::from("$H5INSPECT_POST [file] [dataset]").style(
                     Style::new()
                         .fg(ratatui::style::palette::material::BLUE_GRAY.c200)
+                        .bg(ratatui::style::palette::material::GRAY.c800)
                         .add_modifier(Modifier::BOLD),
                 ),
                 Span::from(":   ").style(DEFAULT_TEXT_STYLE),

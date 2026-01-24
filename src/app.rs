@@ -448,30 +448,23 @@ impl App {
                 }
             }
             KeyCode::Char('i') => {
-                if let Ok(post_cmd) = std::env::var("H5INSPECT_POST") {
-                    let last_path = self
-                        .tree
-                        .as_ref()
-                        .and_then(|tree| tree.get_selected_node(self.tree_state.selected()))
-                        .and_then(|node| match &node.hdf5_object {
-                            Some(Hdf5Object::Dataset(dataset)) => Some(dataset.name().to_string()),
-                            _ => None,
-                        });
+                let post_cmd = std::env::var("H5INSPECT_POST").unwrap_or("echo".into());
+                let last_path = self
+                    .tree
+                    .as_ref()
+                    .and_then(|tree| tree.get_selected_node(self.tree_state.selected()))
+                    .and_then(|node| match &node.hdf5_object {
+                        Some(Hdf5Object::Dataset(dataset)) => Some(dataset.name().to_string()),
+                        _ => None,
+                    });
 
-                    match last_path {
-                        Some(p) => {
-                            self.running = AppFinishingState::ShouldRunCommand(post_cmd, p);
-                        }
-                        None => {
-                            log::debug!(
-                                "Problem finding selected dataset, not running H5INSPECT_POST"
-                            );
-                        }
+                match last_path {
+                    Some(p) => {
+                        self.running = AppFinishingState::ShouldRunCommand(post_cmd, p);
                     }
-                } else {
-                    log::debug!(
-                        "Environment variable H5INSPECT_POST not set, not running any command"
-                    );
+                    None => {
+                        log::debug!("Problem finding selected dataset, not running H5INSPECT_POST");
+                    }
                 }
             }
             KeyCode::Enter => {
