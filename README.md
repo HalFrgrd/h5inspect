@@ -14,7 +14,7 @@ h5inspect is a modern, interactive terminal application designed to make explori
 - Mouse support
 - Fuzzy search
 - Data visualization
-- [Launch external analysis scripts](../README.md)
+- [Launch external analysis scripts](h5inspect_post/README.md)
 
 ## Installation
 HDF5 can be built from source and linked statically with the `static` flag.
