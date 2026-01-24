@@ -215,7 +215,9 @@ impl Pixel {
 #[allow(dead_code)]
 pub fn generate_dummy_file() -> Result<()> {
     let file = File::create("dummy.h5")?;
-    generate_dummy_core(&file)
+    generate_dummy_core(&file)?;
+    println!("Created dummy.h5");
+    Ok(())
 }
 
 #[allow(dead_code)]

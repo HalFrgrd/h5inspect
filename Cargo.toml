@@ -16,7 +16,7 @@ static = ["hdf5-metno/static"]
 
 [dependencies]
 chrono = "0.4.42"
-clap = "4.5.23"
+clap = { version = "4.5.23", features = ["color"] }
 color-eyre = "0.6.3"
 dirs = "6.0.0"
 dtoa = "1.0.10"

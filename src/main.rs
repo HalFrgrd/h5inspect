@@ -21,12 +21,41 @@ fn main() -> Result<(), Box<dyn Error>> {
     let matches = clap::Command::new("h5inspect")
         .author("Hal Frigaard")
         .about("Simple TUI to inspect h5 files")
+        .color(clap::ColorChoice::Auto)
+        .styles(
+            clap::builder::Styles::styled()
+                .header(
+                    clap::builder::styling::AnsiColor::Yellow.on_default()
+                        | clap::builder::styling::Effects::BOLD,
+                )
+                .usage(
+                    clap::builder::styling::AnsiColor::Yellow.on_default()
+                        | clap::builder::styling::Effects::BOLD,
+                )
+                .literal(
+                    clap::builder::styling::AnsiColor::Green.on_default()
+                        | clap::builder::styling::Effects::BOLD,
+                )
+                .placeholder(clap::builder::styling::AnsiColor::White.on_default())
+                .error(
+                    clap::builder::styling::AnsiColor::Red.on_default()
+                        | clap::builder::styling::Effects::BOLD,
+                )
+                .valid(
+                    clap::builder::styling::AnsiColor::Green.on_default()
+                        | clap::builder::styling::Effects::BOLD,
+                )
+                .invalid(
+                    clap::builder::styling::AnsiColor::Red.on_default()
+                        | clap::builder::styling::Effects::BOLD,
+                ),
+        )
         .arg(
             clap::Arg::new("h5file")
                 .value_name("FILE")
                 .help("Name of hdf5 file to inspect")
                 .value_hint(clap::ValueHint::FilePath)
-                .required(false),
+                .required_unless_present("generate-dummy-file"),
         )
         .arg(
             clap::Arg::new("analyze-dataset")
