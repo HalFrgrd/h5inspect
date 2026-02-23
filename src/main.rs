@@ -114,20 +114,29 @@ fn main() -> Result<(), Box<dyn Error>> {
 
         if let Ok(ref finishing_state) = res {
             if let app::AppFinishingState::ShouldRunCommand(post_cmd, ds_path) = finishing_state {
-                println!(
-                    "H5INSPECT_POST running: {} {} {}",
-                    post_cmd, h5_file_name, ds_path
-                );
-                let mut child = std::process::Command::new(post_cmd)
-                    .arg(h5_file_name)
-                    .arg(ds_path)
-                    .stdin(std::process::Stdio::inherit())
-                    .stdout(std::process::Stdio::inherit())
-                    .stderr(std::process::Stdio::inherit())
-                    .spawn()?;
-                let status = child.wait()?;
-                if !status.success() {
-                    eprintln!("H5INSPECT_POST script exited with status: {}", status);
+                match post_cmd {
+                    None => {
+                        println!(
+                            "H5INSPECT_POST is not set. See example script at: https://github.com/HalFrgrd/h5inspect/blob/main/h5inspect_post/h5inspect_post_example.py"
+                        );
+                    }
+                    Some(cmd) => {
+                        println!(
+                            "H5INSPECT_POST running: {} {} {}",
+                            cmd, h5_file_name, ds_path
+                        );
+                        let mut child = std::process::Command::new(cmd)
+                            .arg(h5_file_name)
+                            .arg(ds_path)
+                            .stdin(std::process::Stdio::inherit())
+                            .stdout(std::process::Stdio::inherit())
+                            .stderr(std::process::Stdio::inherit())
+                            .spawn()?;
+                        let status = child.wait()?;
+                        if !status.success() {
+                            eprintln!("H5INSPECT_POST script exited with status: {}", status);
+                        }
+                    }
                 }
             }
         }
