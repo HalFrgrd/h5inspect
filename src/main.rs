@@ -102,36 +102,40 @@ fn main() -> Result<(), Box<dyn Error>> {
     } else {
         log::info!("Starting app");
 
-        let app = App::new(h5_file_path);
         let runtime = build_runtime();
 
         color_eyre::install()?;
-        let terminal = ratatui::init();
-        crossterm::execute!(std::io::stdout(), crossterm::event::EnableMouseCapture)?;
-        let res = runtime.block_on(app.run(terminal));
-        crossterm::execute!(std::io::stdout(), crossterm::event::DisableMouseCapture)?;
-        ratatui::restore();
+        loop {
+            let app = App::new(h5_file_path.clone());
+            let terminal = ratatui::init();
+            crossterm::execute!(std::io::stdout(), crossterm::event::EnableMouseCapture)?;
+            let res = runtime.block_on(app.run(terminal));
+            crossterm::execute!(std::io::stdout(), crossterm::event::DisableMouseCapture)?;
+            ratatui::restore();
 
-        if let Ok(ref finishing_state) = res {
-            if let app::AppFinishingState::ShouldRunCommand(post_cmd, ds_path) = finishing_state {
-                println!(
-                    "H5INSPECT_POST running: {} {} {}",
-                    post_cmd, h5_file_name, ds_path
-                );
-                let mut child = std::process::Command::new(post_cmd)
-                    .arg(h5_file_name)
-                    .arg(ds_path)
-                    .stdin(std::process::Stdio::inherit())
-                    .stdout(std::process::Stdio::inherit())
-                    .stderr(std::process::Stdio::inherit())
-                    .spawn()?;
-                let status = child.wait()?;
-                if !status.success() {
-                    eprintln!("H5INSPECT_POST script exited with status: {}", status);
+            match res {
+                Ok(app::AppFinishingState::ShouldRunCommand(post_cmd, ds_path)) => {
+                    println!(
+                        "H5INSPECT_POST running: {} {} {}",
+                        post_cmd, h5_file_name, ds_path
+                    );
+                    let mut child = std::process::Command::new(post_cmd)
+                        .arg(h5_file_name)
+                        .arg(ds_path)
+                        .stdin(std::process::Stdio::inherit())
+                        .stdout(std::process::Stdio::inherit())
+                        .stderr(std::process::Stdio::inherit())
+                        .spawn()?;
+                    let status = child.wait()?;
+                    if !status.success() {
+                        eprintln!("H5INSPECT_POST script exited with status: {}", status);
+                    }
+                    // Restart the TUI so the user can continue where they left off
                 }
+                Ok(_) => return Ok(()),
+                Err(e) => return Err(e),
             }
         }
-        res.map(|_| ())
     }
 }
 
