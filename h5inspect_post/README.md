@@ -1,5 +1,5 @@
 # h5inspect_post
-When you press `i` in h5inspect, the app will quit and launch `$H5INSPECT_POST [file] [dataset]`.
+When you press `i` in h5inspect on a selected dataset or group, the app will quit and launch `$H5INSPECT_POST [file] [dataset_or_group]`.
 An example script is provided:
 
 ```python
@@ -10,19 +10,19 @@ from IPython import embed
 
 def main():
     if len(sys.argv) != 3:
-        print(f"Usage: {sys.argv[0]} <file> <dataset_path>")
+        print(f"Usage: {sys.argv[0]} <file> <dataset_or_group_path>")
         sys.exit(1)
 
-    filename, dataset_path = sys.argv[1], sys.argv[2]
+    filename, path = sys.argv[1], sys.argv[2]
 
     try:
         with h5py.File(filename, "r") as f:
-            if dataset_path not in f:
-                print(f"Dataset path '{dataset_path}' not found in file.")
+            if path not in f:
+                print(f"Path '{path}' not found in file.")
                 sys.exit(1)
 
-            dset = f[dataset_path]
-            print(f"Opened dataset '{dataset_path}' from '{filename}'")
+            dset = f[path]
+            print(f"Opened '{path}' from '{filename}'")
             print(f"Shape: {dset.shape}, Dtype: {dset.dtype}")
 
             # Drop into IPython shell with useful locals
@@ -48,4 +48,4 @@ if __name__ == "__main__":
    export H5INSPECT_POST=/path/to/h5inspect_post_example.py
    ```
 
-3. Use h5inspect and press `i` on a dataset to launch an interactive IPython session with the dataset loaded.
+3. Use h5inspect and press `i` on a dataset or group to launch an external script with the selected path.
