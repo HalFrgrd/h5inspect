@@ -1,0 +1,58 @@
+name: Update Demo GIF
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["master"]
+    paths:
+      - "vhs/vhs.tape"
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: update-demo-gif
+  cancel-in-progress: true
+
+jobs:
+  update-gif:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg zsh
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: 'stable'
+
+      - name: Install VHS
+        run: go install github.com/charmbracelet/vhs@latest
+
+      - name: Build h5inspect
+        run: cargo build --release --features static
+
+      - name: Install h5inspect to PATH
+        run: echo "$GITHUB_WORKSPACE/target/release" >> $GITHUB_PATH
+
+      - name: Generate dummy HDF5 file
+        run: h5inspect --generate-dummy-file && cp dummy.h5 "$HOME/"
+
+      - name: Generate GIF with VHS
+        run: vhs vhs/vhs.tape
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v7
+        with:
+          commit-message: "chore: update demo GIF"
+          title: "chore: update demo GIF"
+          body: "Automated update of the demo GIF using VHS."
+          branch: "chore/update-demo-gif"
+          base: "master"
+          add-paths: "vhs/demo.gif"
