@@ -21,12 +21,15 @@ def main():
                 print(f"Path '{path}' not found in file.")
                 sys.exit(1)
 
-            dset = f[path]
+            h5_obj = f[path]
             print(f"Opened '{path}' from '{filename}'")
-            print(f"Shape: {dset.shape}, Dtype: {dset.dtype}")
+            if isinstance(h5_obj, h5py.Dataset):
+                print(f"Shape: {h5_obj.shape}, Dtype: {h5_obj.dtype}")
+            elif isinstance(h5_obj, h5py.Group):
+                print(f"Group contains {len(h5_obj)} items")
 
             # Drop into IPython shell with useful locals
-            embed(header="Interactive HDF5 session.\nAvailable vars: f (file), dset (dataset)")
+            embed(header="Interactive HDF5 session.\nAvailable vars: f (file), h5_obj (dataset or group)")
 
     except Exception as e:
         print(f"Error: {e}")
@@ -34,6 +37,8 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
 ```
 
 ## Usage

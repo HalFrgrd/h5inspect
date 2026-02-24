@@ -48,7 +48,7 @@ pub type NodeIdT = hdf5_metno_sys::h5i::hid_t;
 pub enum AppFinishingState {
     Continue,
     Quit,
-    ShouldRunCommand(String, String),
+    ShouldRunCommand(Option<String>, String),
 }
 
 pub struct App {
@@ -448,7 +448,7 @@ impl App {
                 }
             }
             KeyCode::Char('i') => {
-                let post_cmd = std::env::var("H5INSPECT_POST").unwrap_or("echo".into());
+                let post_cmd = std::env::var("H5INSPECT_POST").ok();
                 let last_path = self
                     .tree
                     .as_ref()
