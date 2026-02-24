@@ -455,6 +455,7 @@ impl App {
                     .and_then(|tree| tree.get_selected_node(self.tree_state.selected()))
                     .and_then(|node| match &node.hdf5_object {
                         Some(Hdf5Object::Dataset(dataset)) => Some(dataset.name().to_string()),
+                        Some(Hdf5Object::Group(group)) => Some(group.name().to_string()),
                         _ => None,
                     });
 
@@ -463,7 +464,9 @@ impl App {
                         self.running = AppFinishingState::ShouldRunCommand(post_cmd, p);
                     }
                     None => {
-                        log::debug!("Problem finding selected dataset, not running H5INSPECT_POST");
+                        log::debug!(
+                            "Problem finding selected dataset or group, not running H5INSPECT_POST"
+                        );
                     }
                 }
             }

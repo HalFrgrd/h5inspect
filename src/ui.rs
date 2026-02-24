@@ -505,7 +505,7 @@ fn render_help_screen(frame: &mut Frame, app: &mut App, area: Rect) {
             ]),
             Line::from(vec![
                 Span::from("Run ").style(DEFAULT_TEXT_STYLE),
-                Span::from("$H5INSPECT_POST [file] [dataset]").style(
+                Span::from("$H5INSPECT_POST [file] [dataset_or_group]").style(
                     Style::new()
                         .fg(ratatui::style::palette::material::BLUE_GRAY.c200)
                         .bg(ratatui::style::palette::material::GRAY.c800)
