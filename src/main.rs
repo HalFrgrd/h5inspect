@@ -4,7 +4,6 @@ use color_eyre::Result;
 use ratatui;
 use serde_json;
 use std::error::Error;
-use std::io::{stdout, Write};
 use std::path::PathBuf;
 use tui_logger;
 
@@ -106,46 +105,16 @@ fn main() -> Result<(), Box<dyn Error>> {
         let runtime = build_runtime();
 
         color_eyre::install()?;
-        loop {
-            let app = App::new(h5_file_path.clone());
-            let terminal = ratatui::init();
-            crossterm::execute!(std::io::stdout(), crossterm::event::EnableMouseCapture)?;
-            let res = runtime.block_on(app.run(terminal));
-            crossterm::execute!(std::io::stdout(), crossterm::event::DisableMouseCapture)?;
-            ratatui::restore();
+        let app = App::new(h5_file_path.clone());
+        let terminal = ratatui::init();
+        crossterm::execute!(std::io::stdout(), crossterm::event::EnableMouseCapture)?;
+        let res = runtime.block_on(app.run(terminal));
+        crossterm::execute!(std::io::stdout(), crossterm::event::DisableMouseCapture)?;
+        ratatui::restore();
 
-            match res {
-                Ok(app::AppFinishingState::ShouldRunCommand(post_cmd, ds_path)) => match post_cmd {
-                    Some(post_cmd) => {
-                        println!(
-                            "H5INSPECT_POST running: {} {} {}",
-                            post_cmd, h5_file_name, ds_path
-                        );
-                        let mut child = std::process::Command::new(post_cmd)
-                            .arg(h5_file_name)
-                            .arg(ds_path)
-                            .stdin(std::process::Stdio::inherit())
-                            .stdout(std::process::Stdio::inherit())
-                            .stderr(std::process::Stdio::inherit())
-                            .spawn()?;
-                        let status = child.wait()?;
-                        if !status.success() {
-                            eprintln!("H5INSPECT_POST script exited with status: {}", status);
-                        }
-                    }
-                    None => {
-                        println!("H5INSPECT_POST not set. See https://github.com/HalFrgrd/h5inspect/blob/master/h5inspect_post/README.md");
-                        for i in 1..=5 {
-                            print!("Continuing in {} seconds...", 6 - i);
-                            stdout().flush().ok();
-                            std::thread::sleep(std::time::Duration::from_secs(1));
-                            print!("\r");
-                        }
-                    }
-                },
-                Ok(_) => return Ok(()),
-                Err(e) => return Err(e),
-            }
+        match res {
+            Ok(_) => Ok(()),
+            Err(e) => Err(e),
         }
     }
 }
