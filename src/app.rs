@@ -7,6 +7,7 @@ use crate::tree::TreeNode;
 use crate::ui::ui;
 use crossterm::event::{MouseButton, MouseEventKind};
 use hdf5_metno as hdf5;
+use std::io::{stdout, Write};
 use std::time::Instant;
 
 use chrono::{DateTime, Local};
@@ -48,7 +49,12 @@ pub type NodeIdT = hdf5_metno_sys::h5i::hid_t;
 pub enum AppFinishingState {
     Continue,
     Quit,
-    ShouldRunCommand(Option<String>, String),
+}
+
+pub enum KeyPressResult {
+    Redraw,
+    DontRedraw,
+    RunPostCommand(Option<String>, String),
 }
 
 pub struct App {
@@ -412,7 +418,7 @@ impl App {
         }
     }
 
-    fn on_keypress_tree_mode(&mut self, keycode: crossterm::event::KeyCode) -> () {
+    fn on_keypress_tree_mode(&mut self, keycode: crossterm::event::KeyCode) -> KeyPressResult {
         match keycode {
             KeyCode::Left => {
                 if self.filtered_tree.is_some() {
@@ -461,7 +467,7 @@ impl App {
 
                 match last_path {
                     Some(p) => {
-                        self.running = AppFinishingState::ShouldRunCommand(post_cmd, p);
+                        return KeyPressResult::RunPostCommand(post_cmd, p);
                     }
                     None => {
                         log::debug!(
@@ -528,6 +534,7 @@ impl App {
             }
             _ => {}
         }
+        KeyPressResult::Redraw
     }
 
     pub fn search_query_and_cursor(&self) -> (String, u16) {
@@ -538,12 +545,13 @@ impl App {
         (text, cursor_pos.try_into().unwrap())
     }
 
-    fn on_keypress_search_mode(&mut self, key: crossterm::event::KeyEvent) {
+    fn on_keypress_search_mode(&mut self, key: crossterm::event::KeyEvent) -> KeyPressResult {
         let keycode = key.code;
         let mut refresh_filtered_tree = true;
-        match keycode {
+        let result = match keycode {
             KeyCode::Char(to_insert) => {
                 self.search_query_left.push(to_insert);
+                KeyPressResult::Redraw
             }
             KeyCode::Left => {
                 if key.modifiers.contains(KeyModifiers::CONTROL) {
@@ -559,6 +567,7 @@ impl App {
                         .pop()
                         .map(|c| self.search_query_right.push(c));
                 }
+                KeyPressResult::Redraw
             }
             KeyCode::Right => {
                 if key.modifiers.contains(KeyModifiers::CONTROL) {
@@ -574,30 +583,41 @@ impl App {
                         .pop()
                         .map(|c| self.search_query_left.push(c));
                 }
+                KeyPressResult::Redraw
             }
-            KeyCode::Home => self
-                .search_query_right
-                .extend(self.search_query_left.drain(..).rev()),
-            KeyCode::End => self
-                .search_query_left
-                .extend(self.search_query_right.drain(..).rev()),
+            KeyCode::Home => {
+                self.search_query_right
+                    .extend(self.search_query_left.drain(..).rev());
+                KeyPressResult::Redraw
+            }
+            KeyCode::End => {
+                self.search_query_left
+                    .extend(self.search_query_right.drain(..).rev());
+                KeyPressResult::Redraw
+            }
             KeyCode::Backspace => {
                 self.search_query_left.pop();
+                KeyPressResult::Redraw
             }
             KeyCode::Delete => {
                 self.search_query_right.pop();
+                KeyPressResult::Redraw
             }
             other => {
                 refresh_filtered_tree = false;
-                self.on_keypress_tree_mode(other);
+                self.on_keypress_tree_mode(other)
             }
         };
         if refresh_filtered_tree {
             self.update_filtered_tree();
         }
+        result
     }
 
-    fn on_keypress_object_info_mode(&mut self, keycode: crossterm::event::KeyCode) {
+    fn on_keypress_object_info_mode(
+        &mut self,
+        keycode: crossterm::event::KeyCode,
+    ) -> KeyPressResult {
         match keycode {
             KeyCode::Up | KeyCode::Char('k') => {
                 self.object_info_scroll_state = self.object_info_scroll_state.saturating_sub(1);
@@ -628,10 +648,11 @@ impl App {
                 self.show_logs = !self.show_logs;
             }
             KeyCode::Char('i') => {
-                self.on_keypress_tree_mode(keycode);
+                return self.on_keypress_tree_mode(keycode);
             }
             _ => {}
         };
+        KeyPressResult::Redraw
     }
 
     fn on_keypress_help_screen_mode(&mut self, keycode: crossterm::event::KeyCode) {
@@ -797,22 +818,25 @@ impl App {
         }
     }
 
-    pub async fn run<B: ratatui::backend::Backend>(
+    pub async fn run(
         mut self,
-        mut terminal: ratatui::Terminal<B>,
     ) -> Result<AppFinishingState, Box<dyn std::error::Error>> {
         let h5_file = h5_utils::open_file(&self.h5_file_path)?;
 
-        let mut events = events::EventHandler::new();
+        let (sender, receiver) = tokio::sync::mpsc::unbounded_channel();
+        let mut events = events::EventHandler::new(receiver);
 
         // Spawn a task to load the HDF5 file structure since it might be slow
         tokio::task::spawn_blocking(move || {
             let tree = App::tree_from_h5(&h5_file).expect("Failed to parse HDF5 structure");
             let tree_update = events::Event::TreeUpdate(tree);
-            events.sender.clone().send(tree_update).unwrap();
+            sender.clone().send(tree_update).unwrap();
         });
 
         let mut redraw = true;
+        let mut terminal = ratatui::init();
+        crossterm::execute!(std::io::stdout(), crossterm::event::EnableMouseCapture)?;
+
         while self.running == AppFinishingState::Continue {
             if let Some(last_selected) = &self.tree_state_last_rendered_selected {
                 if last_selected != self.tree_state.selected() {
@@ -835,79 +859,135 @@ impl App {
                 self.tree_state_last_rendered_selected = Some(self.tree_state.selected().to_vec());
             }
 
-            if let Some(event) = events.receiver.recv().await {
-                redraw = match event {
-                    events::Event::AnimationTick => {
-                        self.animation_state = self.animation_state.wrapping_add(1);
-                        true
+            redraw = match events.next_event() {
+                events::Event::AnimationTick => {
+                    self.animation_state = self.animation_state.wrapping_add(1);
+                    true
+                }
+                events::Event::Key(key) => {
+                    match self.handle_keypress(key) {
+                        KeyPressResult::Redraw => true,
+                        KeyPressResult::DontRedraw => false,
+                        KeyPressResult::RunPostCommand(post_cmd, ds_path) => {
+                            // Pause the TUI: disable raw mode and leave alternate screen
+                            crossterm::execute!(std::io::stdout(), crossterm::event::DisableMouseCapture)?;
+                            ratatui::restore();
+
+                            // Run the post command
+                            let h5_file_path_str = self.h5_file_path.to_string_lossy().to_string();
+                            match &post_cmd {
+                                Some(cmd) => {
+                                    println!(
+                                        "H5INSPECT_POST running: {} {} {}",
+                                        cmd, h5_file_path_str, ds_path
+                                    );
+                                    match std::process::Command::new(cmd)
+                                        .arg(&h5_file_path_str)
+                                        .arg(&ds_path)
+                                        .stdin(std::process::Stdio::inherit())
+                                        .stdout(std::process::Stdio::inherit())
+                                        .stderr(std::process::Stdio::inherit())
+                                        .spawn()
+                                        .and_then(|mut child| child.wait())
+                                    {
+                                        Ok(status) if !status.success() => {
+                                            eprintln!(
+                                                "H5INSPECT_POST script exited with status: {}",
+                                                status
+                                            );
+                                        }
+                                        Err(e) => {
+                                            eprintln!("Failed to run H5INSPECT_POST: {}", e);
+                                        }
+                                        _ => {}
+                                    }
+                                }
+                                None => {
+                                    println!("H5INSPECT_POST not set. See https://github.com/HalFrgrd/h5inspect/blob/master/h5inspect_post/README.md");
+                                    for i in 1..=5 {
+                                        print!("Continuing in {} seconds...", 6 - i);
+                                        stdout().flush().ok();
+                                        std::thread::sleep(std::time::Duration::from_secs(1));
+                                        print!("\r");
+                                    }
+                                }
+                            }
+
+                             terminal = ratatui::init();
+                            crossterm::execute!(std::io::stdout(), crossterm::event::EnableMouseCapture)?;
+
+                            true
+                        }
                     }
-                    events::Event::Key(key) => {
-                        self.handle_keypress(key);
-                        true
-                    }
-                    events::Event::Mouse(mouse) => self.handle_mouse(mouse),
-                    events::Event::Resize => true,
-                    events::Event::TreeUpdate(tree) => {
-                        self.tree = Some(tree);
-                        self.open_all_tree_nodes();
-                        self.update_filtered_tree();
-                        true
-                    }
+                }
+                events::Event::Mouse(mouse) => self.handle_mouse(mouse),
+                events::Event::Resize => true,
+                events::Event::TreeUpdate(tree) => {
+                    self.tree = Some(tree);
+                    self.open_all_tree_nodes();
+                    self.update_filtered_tree();
+                    true
                 }
             }
         }
+
+        crossterm::execute!(std::io::stdout(), crossterm::event::DisableMouseCapture)?;
+        ratatui::restore();
         Ok(self.running)
     }
 
-    fn handle_keypress(&mut self, key: crossterm::event::KeyEvent) {
+    fn handle_keypress(&mut self, key: crossterm::event::KeyEvent) -> KeyPressResult {
         if key.kind == crossterm::event::KeyEventKind::Press {
             // log::debug!("{:?}",  key);
             // if Ctrl+c is pressed, exit
             if key.code == KeyCode::Char('c') && key.modifiers == KeyModifiers::CONTROL {
                 self.running = AppFinishingState::Quit;
+                return KeyPressResult::Redraw;
             }
 
-            match self.mode {
+            return match self.mode {
                 SelectionMode::TreeBrowsing => match key.code {
                     KeyCode::Char('q') => {
                         self.running = AppFinishingState::Quit;
+                        KeyPressResult::Redraw
                     }
                     KeyCode::Char('/') => {
                         self.mode = SelectionMode::SearchQueryEditing;
+                        KeyPressResult::Redraw
                     }
-                    other => {
-                        self.on_keypress_tree_mode(other);
-                    }
+                    other => self.on_keypress_tree_mode(other),
                 },
                 SelectionMode::SearchQueryEditing => match key.code {
                     KeyCode::Esc | KeyCode::Enter => {
                         self.mode = SelectionMode::TreeBrowsing;
+                        KeyPressResult::Redraw
                     }
-                    _ => {
-                        self.on_keypress_search_mode(key);
-                    }
+                    _ => self.on_keypress_search_mode(key),
                 },
                 SelectionMode::ObjectInfoInspecting => match key.code {
                     KeyCode::Char('q') => {
                         self.running = AppFinishingState::Quit;
+                        KeyPressResult::Redraw
                     }
                     KeyCode::Char('/') => {
                         self.mode = SelectionMode::SearchQueryEditing;
+                        KeyPressResult::Redraw
                     }
-                    other => {
-                        self.on_keypress_object_info_mode(other);
-                    }
+                    other => self.on_keypress_object_info_mode(other),
                 },
                 SelectionMode::HelpScreen => match key.code {
                     KeyCode::Esc | KeyCode::Enter | KeyCode::Char('q') | KeyCode::Char('?') => {
                         self.mode = SelectionMode::TreeBrowsing;
+                        KeyPressResult::Redraw
                     }
                     other => {
                         self.on_keypress_help_screen_mode(other);
+                        KeyPressResult::Redraw
                     }
                 },
-            }
+            };
         }
+        KeyPressResult::DontRedraw
     }
 
     fn handle_mouse(&mut self, mouse: crossterm::event::MouseEvent) -> bool {

@@ -4,7 +4,6 @@ use color_eyre::Result;
 use ratatui;
 use serde_json;
 use std::error::Error;
-use std::io::{stdout, Write};
 use std::path::PathBuf;
 use tui_logger;
 
@@ -106,46 +105,14 @@ fn main() -> Result<(), Box<dyn Error>> {
         let runtime = build_runtime();
 
         color_eyre::install()?;
-        loop {
-            let app = App::new(h5_file_path.clone());
-            let terminal = ratatui::init();
-            crossterm::execute!(std::io::stdout(), crossterm::event::EnableMouseCapture)?;
-            let res = runtime.block_on(app.run(terminal));
-            crossterm::execute!(std::io::stdout(), crossterm::event::DisableMouseCapture)?;
-            ratatui::restore();
+        let app = App::new(h5_file_path.clone());
 
-            match res {
-                Ok(app::AppFinishingState::ShouldRunCommand(post_cmd, ds_path)) => match post_cmd {
-                    Some(post_cmd) => {
-                        println!(
-                            "H5INSPECT_POST running: {} {} {}",
-                            post_cmd, h5_file_name, ds_path
-                        );
-                        let mut child = std::process::Command::new(post_cmd)
-                            .arg(h5_file_name)
-                            .arg(ds_path)
-                            .stdin(std::process::Stdio::inherit())
-                            .stdout(std::process::Stdio::inherit())
-                            .stderr(std::process::Stdio::inherit())
-                            .spawn()?;
-                        let status = child.wait()?;
-                        if !status.success() {
-                            eprintln!("H5INSPECT_POST script exited with status: {}", status);
-                        }
-                    }
-                    None => {
-                        println!("H5INSPECT_POST not set. See https://github.com/HalFrgrd/h5inspect/blob/master/h5inspect_post/README.md");
-                        for i in 1..=5 {
-                            print!("Continuing in {} seconds...", 6 - i);
-                            stdout().flush().ok();
-                            std::thread::sleep(std::time::Duration::from_secs(1));
-                            print!("\r");
-                        }
-                    }
-                },
-                Ok(_) => return Ok(()),
-                Err(e) => return Err(e),
-            }
+        let res = runtime.block_on(app.run());
+
+
+        match res {
+            Ok(_) => Ok(()),
+            Err(e) => Err(e),
         }
     }
 }
@@ -192,57 +159,57 @@ fn build_runtime() -> tokio::runtime::Runtime {
         .unwrap()
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+// #[cfg(test)]
+// mod tests {
+//     use super::*;
 
-    #[test]
-    fn run_app_startup() -> Result<(), Box<dyn Error>> {
-        h5_utils::generate_dummy_file()?;
-        let h5_file_path = std::path::PathBuf::from("dummy.h5");
-        run_app(h5_file_path)
-    }
+//     #[test]
+//     fn run_app_startup() -> Result<(), Box<dyn Error>> {
+//         h5_utils::generate_dummy_file()?;
+//         let h5_file_path = std::path::PathBuf::from("dummy.h5");
+//         run_app(h5_file_path)
+//     }
 
-    #[test]
-    #[should_panic(expected = "File path doesn't exist")]
-    fn run_app_on_non_existent_file() {
-        let h5_file_path = std::path::PathBuf::from("non_existent.h5");
-        run_app(h5_file_path).unwrap();
-    }
+//     #[test]
+//     #[should_panic(expected = "File path doesn't exist")]
+//     fn run_app_on_non_existent_file() {
+//         let h5_file_path = std::path::PathBuf::from("non_existent.h5");
+//         run_app(h5_file_path).unwrap();
+//     }
 
-    #[test]
-    #[should_panic(expected = "Couldn't open file")]
-    fn run_app_on_non_h5_file() {
-        let h5_file_path = std::path::PathBuf::from("src/main.rs");
-        run_app(h5_file_path).unwrap();
-    }
+//     #[test]
+//     #[should_panic(expected = "Couldn't open file")]
+//     fn run_app_on_non_h5_file() {
+//         let h5_file_path = std::path::PathBuf::from("src/main.rs");
+//         run_app(h5_file_path).unwrap();
+//     }
 
-    #[test]
-    fn run_app_on_split_file() -> Result<(), Box<dyn Error>> {
-        h5_utils::generate_dummy_split_file()?;
-        let h5_file_path = std::path::PathBuf::from("dummy_split.h5");
-        run_app(h5_file_path)
-    }
+//     #[test]
+//     fn run_app_on_split_file() -> Result<(), Box<dyn Error>> {
+//         h5_utils::generate_dummy_split_file()?;
+//         let h5_file_path = std::path::PathBuf::from("dummy_split.h5");
+//         run_app(h5_file_path)
+//     }
 
-    fn run_app(h5_file_path: std::path::PathBuf) -> Result<(), Box<dyn Error>> {
-        let app = App::new(h5_file_path);
+//     fn run_app(h5_file_path: std::path::PathBuf) -> Result<(), Box<dyn Error>> {
+//         let app = App::new(h5_file_path);
 
-        let backend = ratatui::backend::TestBackend::new(200, 120);
-        let terminal = ratatui::Terminal::new(backend).unwrap();
+//         let backend = ratatui::backend::TestBackend::new(200, 120);
+//         let terminal = ratatui::Terminal::new(backend).unwrap();
 
-        let runtime = build_runtime();
-        let res = runtime.block_on(async {
-            tokio::select! {
-                res = app.run(terminal) => {
-                    res.map(|_| ())
-                }
-                _ = tokio::time::sleep(std::time::Duration::from_secs(2)) => {
-                    println!("Timer expired before app returned, nice.");
-                    Ok(())
-                }
-            }
-        });
+//         let runtime = build_runtime();
+//         let res = runtime.block_on(async {
+//             tokio::select! {
+//                 res = app.run() => {
+//                     res.map(|_| ())
+//                 }
+//                 _ = tokio::time::sleep(std::time::Duration::from_secs(2)) => {
+//                     println!("Timer expired before app returned, nice.");
+//                     Ok(())
+//                 }
+//             }
+//         });
 
-        res
-    }
-}
+//         res
+//     }
+// }

@@ -1,7 +1,6 @@
 use std::time::Duration;
 
-use crossterm::event::{Event as CrosstermEvent, KeyEvent, MouseEvent};
-use futures::{FutureExt, StreamExt};
+use crossterm::event::{self, Event as CrosstermEvent, KeyEvent, MouseEvent};
 
 use crate::app::NodeIdT;
 use crate::tree::TreeNode;
@@ -18,55 +17,29 @@ pub enum Event {
 #[allow(dead_code)]
 #[derive(Debug)]
 pub struct EventHandler {
-    pub sender: tokio::sync::mpsc::UnboundedSender<Event>,
     pub receiver: tokio::sync::mpsc::UnboundedReceiver<Event>,
-    handler: tokio::task::JoinHandle<()>,
 }
 
 impl EventHandler {
-    pub fn new() -> Self {
-        let (sender, receiver) = tokio::sync::mpsc::unbounded_channel();
-        let sender_clone = sender.clone();
-        let handler = tokio::spawn(async move {
-            let mut reader = crossterm::event::EventStream::new();
-            let mut animation_tick = tokio::time::interval(Duration::from_millis(100));
-            loop {
-                let tick_delay = animation_tick.tick();
-                let crossterm_event = reader.next().fuse();
-                tokio::select! {
-                    _ = sender_clone.closed() => break,
-                    _ = tick_delay => {
-                        sender_clone.send(Event::AnimationTick).unwrap();
-                    }
-                    Some(Ok(evt)) = crossterm_event =>{
-                        match evt {
-                            CrosstermEvent::Key(key) => {
-                                if key.kind == crossterm::event::KeyEventKind::Press {
-                                  sender_clone.send(Event::Key(key)).unwrap();
-                                }
-                            }
-                            CrosstermEvent::Mouse(mouse) => {
-                                if mouse.kind != crossterm::event::MouseEventKind::Moved {
-                                    // Ignore mouse move events to reduce event spam
-                                    // drag events are still sent through
-                                    sender_clone.send(Event::Mouse(mouse)).unwrap();
-                                }
-                            }
-                            CrosstermEvent::Resize(_, _) => {
-                                sender_clone.send(Event::Resize).unwrap();
-                            }
-                            CrosstermEvent::FocusLost => {}
-                            CrosstermEvent::FocusGained => {}
-                            CrosstermEvent::Paste(_) => {}
-                        }
-                    }
+    pub fn new(receiver: tokio::sync::mpsc::UnboundedReceiver<Event>) -> Self {
+        Self { receiver }
+    }
+
+    pub fn next_event(&mut self) -> Event {
+        if event::poll(Duration::from_millis(100)).unwrap() {
+            match event::read().unwrap() {
+                CrosstermEvent::Key(key) => Event::Key(key),
+                CrosstermEvent::Mouse(mouse) => Event::Mouse(mouse),
+                CrosstermEvent::Resize(_, _) => Event::Resize,
+                _ => Event::AnimationTick, // Ignore other events for now
+            }
+        } else {
+            while let Ok(ev) = self.receiver.try_recv() {
+                if matches!(ev, Event::TreeUpdate(_)) {
+                    return ev;
                 }
             }
-        });
-        Self {
-            sender,
-            receiver,
-            handler,
+            Event::AnimationTick
         }
     }
 }
