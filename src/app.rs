@@ -614,7 +614,10 @@ impl App {
         result
     }
 
-    fn on_keypress_object_info_mode(&mut self, keycode: crossterm::event::KeyCode) -> KeyPressResult {
+    fn on_keypress_object_info_mode(
+        &mut self,
+        keycode: crossterm::event::KeyCode,
+    ) -> KeyPressResult {
         match keycode {
             KeyCode::Up | KeyCode::Char('k') => {
                 self.object_info_scroll_state = self.object_info_scroll_state.saturating_sub(1);
@@ -821,13 +824,14 @@ impl App {
     ) -> Result<AppFinishingState, Box<dyn std::error::Error>> {
         let h5_file = h5_utils::open_file(&self.h5_file_path)?;
 
-        let mut events = events::EventHandler::new();
+        let (sender, receiver) = tokio::sync::mpsc::unbounded_channel();
+        let mut events = events::EventHandler::new(receiver);
 
         // Spawn a task to load the HDF5 file structure since it might be slow
         tokio::task::spawn_blocking(move || {
             let tree = App::tree_from_h5(&h5_file).expect("Failed to parse HDF5 structure");
             let tree_update = events::Event::TreeUpdate(tree);
-            events.sender.clone().send(tree_update).unwrap();
+            sender.clone().send(tree_update).unwrap();
         });
 
         let mut redraw = true;
@@ -853,96 +857,93 @@ impl App {
                 self.tree_state_last_rendered_selected = Some(self.tree_state.selected().to_vec());
             }
 
-            if let Some(event) = events.receiver.recv().await {
-                redraw = match event {
-                    events::Event::AnimationTick => {
-                        self.animation_state = self.animation_state.wrapping_add(1);
-                        true
-                    }
-                    events::Event::Key(key) => {
-                        match self.handle_keypress(key) {
-                            KeyPressResult::Redraw => true,
-                            KeyPressResult::DontRedraw => false,
-                            KeyPressResult::RunPostCommand(post_cmd, ds_path) => {
-                                // Pause the TUI: disable raw mode and leave alternate screen
-                                if let Err(e) = crossterm::terminal::disable_raw_mode() {
-                                    log::warn!("Failed to disable raw mode: {}", e);
-                                }
-                                if let Err(e) = crossterm::execute!(
-                                    stdout(),
-                                    crossterm::terminal::LeaveAlternateScreen,
-                                    crossterm::event::DisableMouseCapture
-                                ) {
-                                    log::warn!("Failed to leave alternate screen: {}", e);
-                                }
-
-                                // Run the post command
-                                let h5_file_path_str =
-                                    self.h5_file_path.to_string_lossy().to_string();
-                                match &post_cmd {
-                                    Some(cmd) => {
-                                        println!(
-                                            "H5INSPECT_POST running: {} {} {}",
-                                            cmd, h5_file_path_str, ds_path
-                                        );
-                                        match std::process::Command::new(cmd)
-                                            .arg(&h5_file_path_str)
-                                            .arg(&ds_path)
-                                            .stdin(std::process::Stdio::inherit())
-                                            .stdout(std::process::Stdio::inherit())
-                                            .stderr(std::process::Stdio::inherit())
-                                            .spawn()
-                                            .and_then(|mut child| child.wait())
-                                        {
-                                            Ok(status) if !status.success() => {
-                                                eprintln!(
-                                                    "H5INSPECT_POST script exited with status: {}",
-                                                    status
-                                                );
-                                            }
-                                            Err(e) => {
-                                                eprintln!("Failed to run H5INSPECT_POST: {}", e);
-                                            }
-                                            _ => {}
-                                        }
-                                    }
-                                    None => {
-                                        println!("H5INSPECT_POST not set. See https://github.com/HalFrgrd/h5inspect/blob/master/h5inspect_post/README.md");
-                                        for i in 1..=5 {
-                                            print!("Continuing in {} seconds...", 6 - i);
-                                            stdout().flush().ok();
-                                            std::thread::sleep(std::time::Duration::from_secs(1));
-                                            print!("\r");
-                                        }
-                                    }
-                                }
-
-                                // Resume the TUI: re-enter alternate screen and enable raw mode
-                                if let Err(e) = crossterm::execute!(
-                                    stdout(),
-                                    crossterm::terminal::EnterAlternateScreen,
-                                    crossterm::event::EnableMouseCapture
-                                ) {
-                                    log::warn!("Failed to re-enter alternate screen: {}", e);
-                                }
-                                if let Err(e) = crossterm::terminal::enable_raw_mode() {
-                                    log::warn!("Failed to re-enable raw mode: {}", e);
-                                }
-                                if let Err(e) = terminal.clear() {
-                                    log::warn!("Failed to clear terminal: {}", e);
-                                }
-                                true
+            redraw = match events.next_event() {
+                events::Event::AnimationTick => {
+                    self.animation_state = self.animation_state.wrapping_add(1);
+                    true
+                }
+                events::Event::Key(key) => {
+                    match self.handle_keypress(key) {
+                        KeyPressResult::Redraw => true,
+                        KeyPressResult::DontRedraw => false,
+                        KeyPressResult::RunPostCommand(post_cmd, ds_path) => {
+                            // Pause the TUI: disable raw mode and leave alternate screen
+                            if let Err(e) = crossterm::terminal::disable_raw_mode() {
+                                log::warn!("Failed to disable raw mode: {}", e);
                             }
+                            if let Err(e) = crossterm::execute!(
+                                stdout(),
+                                crossterm::terminal::LeaveAlternateScreen,
+                                crossterm::event::DisableMouseCapture
+                            ) {
+                                log::warn!("Failed to leave alternate screen: {}", e);
+                            }
+
+                            // Run the post command
+                            let h5_file_path_str = self.h5_file_path.to_string_lossy().to_string();
+                            match &post_cmd {
+                                Some(cmd) => {
+                                    println!(
+                                        "H5INSPECT_POST running: {} {} {}",
+                                        cmd, h5_file_path_str, ds_path
+                                    );
+                                    match std::process::Command::new(cmd)
+                                        .arg(&h5_file_path_str)
+                                        .arg(&ds_path)
+                                        .stdin(std::process::Stdio::inherit())
+                                        .stdout(std::process::Stdio::inherit())
+                                        .stderr(std::process::Stdio::inherit())
+                                        .spawn()
+                                        .and_then(|mut child| child.wait())
+                                    {
+                                        Ok(status) if !status.success() => {
+                                            eprintln!(
+                                                "H5INSPECT_POST script exited with status: {}",
+                                                status
+                                            );
+                                        }
+                                        Err(e) => {
+                                            eprintln!("Failed to run H5INSPECT_POST: {}", e);
+                                        }
+                                        _ => {}
+                                    }
+                                }
+                                None => {
+                                    println!("H5INSPECT_POST not set. See https://github.com/HalFrgrd/h5inspect/blob/master/h5inspect_post/README.md");
+                                    for i in 1..=5 {
+                                        print!("Continuing in {} seconds...", 6 - i);
+                                        stdout().flush().ok();
+                                        std::thread::sleep(std::time::Duration::from_secs(1));
+                                        print!("\r");
+                                    }
+                                }
+                            }
+
+                            // Resume the TUI: re-enter alternate screen and enable raw mode
+                            if let Err(e) = crossterm::execute!(
+                                stdout(),
+                                crossterm::terminal::EnterAlternateScreen,
+                                crossterm::event::EnableMouseCapture
+                            ) {
+                                log::warn!("Failed to re-enter alternate screen: {}", e);
+                            }
+                            if let Err(e) = crossterm::terminal::enable_raw_mode() {
+                                log::warn!("Failed to re-enable raw mode: {}", e);
+                            }
+                            if let Err(e) = terminal.clear() {
+                                log::warn!("Failed to clear terminal: {}", e);
+                            }
+                            true
                         }
                     }
-                    events::Event::Mouse(mouse) => self.handle_mouse(mouse),
-                    events::Event::Resize => true,
-                    events::Event::TreeUpdate(tree) => {
-                        self.tree = Some(tree);
-                        self.open_all_tree_nodes();
-                        self.update_filtered_tree();
-                        true
-                    }
+                }
+                events::Event::Mouse(mouse) => self.handle_mouse(mouse),
+                events::Event::Resize => true,
+                events::Event::TreeUpdate(tree) => {
+                    self.tree = Some(tree);
+                    self.open_all_tree_nodes();
+                    self.update_filtered_tree();
+                    true
                 }
             }
         }
