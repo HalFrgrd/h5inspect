@@ -106,11 +106,9 @@ fn main() -> Result<(), Box<dyn Error>> {
 
         color_eyre::install()?;
         let app = App::new(h5_file_path.clone());
-        let terminal = ratatui::init();
-        crossterm::execute!(std::io::stdout(), crossterm::event::EnableMouseCapture)?;
-        let res = runtime.block_on(app.run(terminal));
-        crossterm::execute!(std::io::stdout(), crossterm::event::DisableMouseCapture)?;
-        ratatui::restore();
+
+        let res = runtime.block_on(app.run());
+
 
         match res {
             Ok(_) => Ok(()),
@@ -202,7 +200,7 @@ mod tests {
         let runtime = build_runtime();
         let res = runtime.block_on(async {
             tokio::select! {
-                res = app.run(terminal) => {
+                res = app.run() => {
                     res.map(|_| ())
                 }
                 _ = tokio::time::sleep(std::time::Duration::from_secs(2)) => {

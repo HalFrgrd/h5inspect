@@ -818,9 +818,8 @@ impl App {
         }
     }
 
-    pub async fn run<B: ratatui::backend::Backend>(
+    pub async fn run(
         mut self,
-        mut terminal: ratatui::Terminal<B>,
     ) -> Result<AppFinishingState, Box<dyn std::error::Error>> {
         let h5_file = h5_utils::open_file(&self.h5_file_path)?;
 
@@ -835,6 +834,9 @@ impl App {
         });
 
         let mut redraw = true;
+        let mut terminal = ratatui::init();
+        crossterm::execute!(std::io::stdout(), crossterm::event::EnableMouseCapture)?;
+
         while self.running == AppFinishingState::Continue {
             if let Some(last_selected) = &self.tree_state_last_rendered_selected {
                 if last_selected != self.tree_state.selected() {
@@ -868,16 +870,8 @@ impl App {
                         KeyPressResult::DontRedraw => false,
                         KeyPressResult::RunPostCommand(post_cmd, ds_path) => {
                             // Pause the TUI: disable raw mode and leave alternate screen
-                            if let Err(e) = crossterm::terminal::disable_raw_mode() {
-                                log::warn!("Failed to disable raw mode: {}", e);
-                            }
-                            if let Err(e) = crossterm::execute!(
-                                stdout(),
-                                crossterm::terminal::LeaveAlternateScreen,
-                                crossterm::event::DisableMouseCapture
-                            ) {
-                                log::warn!("Failed to leave alternate screen: {}", e);
-                            }
+                            crossterm::execute!(std::io::stdout(), crossterm::event::DisableMouseCapture)?;
+                            ratatui::restore();
 
                             // Run the post command
                             let h5_file_path_str = self.h5_file_path.to_string_lossy().to_string();
@@ -919,20 +913,9 @@ impl App {
                                 }
                             }
 
-                            // Resume the TUI: re-enter alternate screen and enable raw mode
-                            if let Err(e) = crossterm::execute!(
-                                stdout(),
-                                crossterm::terminal::EnterAlternateScreen,
-                                crossterm::event::EnableMouseCapture
-                            ) {
-                                log::warn!("Failed to re-enter alternate screen: {}", e);
-                            }
-                            if let Err(e) = crossterm::terminal::enable_raw_mode() {
-                                log::warn!("Failed to re-enable raw mode: {}", e);
-                            }
-                            if let Err(e) = terminal.clear() {
-                                log::warn!("Failed to clear terminal: {}", e);
-                            }
+                             terminal = ratatui::init();
+                            crossterm::execute!(std::io::stdout(), crossterm::event::EnableMouseCapture)?;
+
                             true
                         }
                     }
@@ -947,6 +930,9 @@ impl App {
                 }
             }
         }
+
+        crossterm::execute!(std::io::stdout(), crossterm::event::DisableMouseCapture)?;
+        ratatui::restore();
         Ok(self.running)
     }
 
