@@ -818,24 +818,23 @@ impl App {
         }
     }
 
-    pub async fn run(
+    pub async fn run<B: ratatui::backend::Backend>(
         mut self,
+        mut terminal: ratatui::Terminal<B>,
+        reinit_terminal: impl Fn() -> ratatui::Terminal<B>,
     ) -> Result<AppFinishingState, Box<dyn std::error::Error>> {
         let h5_file = h5_utils::open_file(&self.h5_file_path)?;
 
-        let (sender, receiver) = tokio::sync::mpsc::unbounded_channel();
-        let mut events = events::EventHandler::new(receiver);
+        let mut events = events::EventHandler::new();
 
         // Spawn a task to load the HDF5 file structure since it might be slow
         tokio::task::spawn_blocking(move || {
             let tree = App::tree_from_h5(&h5_file).expect("Failed to parse HDF5 structure");
             let tree_update = events::Event::TreeUpdate(tree);
-            sender.clone().send(tree_update).unwrap();
+            events.sender.clone().send(tree_update).expect("Failed to send tree update event");
         });
 
         let mut redraw = true;
-        let mut terminal = ratatui::init();
-        crossterm::execute!(std::io::stdout(), crossterm::event::EnableMouseCapture)?;
 
         while self.running == AppFinishingState::Continue {
             if let Some(last_selected) = &self.tree_state_last_rendered_selected {
@@ -859,7 +858,8 @@ impl App {
                 self.tree_state_last_rendered_selected = Some(self.tree_state.selected().to_vec());
             }
 
-            redraw = match events.next_event() {
+            redraw = if let Some(event) = events.receiver.recv().await {
+                match event {
                 events::Event::AnimationTick => {
                     self.animation_state = self.animation_state.wrapping_add(1);
                     true
@@ -913,8 +913,7 @@ impl App {
                                 }
                             }
 
-                             terminal = ratatui::init();
-                            crossterm::execute!(std::io::stdout(), crossterm::event::EnableMouseCapture)?;
+                             terminal = reinit_terminal();
 
                             true
                         }
@@ -928,7 +927,7 @@ impl App {
                     self.update_filtered_tree();
                     true
                 }
-            }
+            }} else { false };
         }
 
         crossterm::execute!(std::io::stdout(), crossterm::event::DisableMouseCapture)?;
