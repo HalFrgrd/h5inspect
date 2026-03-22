@@ -7,7 +7,7 @@ HDF5 files are great but current command line tools make it difficult to view th
 
 h5inspect is a modern, interactive terminal application designed to make exploring HDF5 files intuitive and efficient. Navigate through complex hierarchical data structures with ease, inspect metadata, and visualize datasets all from your command line.
 
-![Demo GIF](vhs/demo.gif)
+![Demo GIF](https://github.com/HalFrgrd/h5inspect/releases/download/assets/demo.gif)
 
 ## Features
 - Keyboard navigation (arrow keys + vim bindings)

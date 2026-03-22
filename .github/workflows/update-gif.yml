@@ -7,7 +7,6 @@ on:
 
 permissions:
   contents: write
-  pull-requests: write
 
 concurrency:
   group: update-demo-gif
@@ -45,12 +44,9 @@ jobs:
       - name: Generate GIF with VHS
         run: vhs vhs/vhs.tape
 
-      - name: Create Pull Request
-        uses: peter-evans/create-pull-request@v7
-        with:
-          commit-message: "chore: update demo GIF"
-          title: "chore: update demo GIF"
-          body: "Automated update of the demo GIF using VHS."
-          branch: "chore/update-demo-gif"
-          base: "master"
-          add-paths: "vhs/demo.gif"
+      - name: Upload GIF to assets release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create assets --title "assets" --notes "Demo GIF storage" 2>/dev/null || true
+          gh release upload assets vhs/demo.gif --clobber
