@@ -41,7 +41,7 @@ enum Styles {
 
 fn get_style(style: Styles, mode: SelectionMode) -> Style {
     let s = match style {
-        Styles::TreeItemHighlight => Style::new().bg(Color::DarkGray),
+        Styles::TreeItemHighlight => Style::new().reversed(),
         Styles::DefaultText => Style::new().fg(Color::White),
         Styles::SearchCharMatch => Style::new().fg(Color::Red).add_modifier(Modifier::BOLD),
         Styles::Magenta => Style::new().fg(Color::Rgb(MAGENTA_R, MAGENTA_G, MAGENTA_B)),
