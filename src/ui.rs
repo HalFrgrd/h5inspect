@@ -41,7 +41,7 @@ enum Styles {
 
 fn get_style(style: Styles, mode: SelectionMode) -> Style {
     let s = match style {
-        Styles::TreeItemHighlight => Style::new().bg(Color::DarkGray),
+        Styles::TreeItemHighlight => Style::new().reversed(),
         Styles::DefaultText => Style::new().fg(Color::White),
         Styles::SearchCharMatch => Style::new().fg(Color::Red).add_modifier(Modifier::BOLD),
         Styles::Magenta => Style::new().fg(Color::Rgb(MAGENTA_R, MAGENTA_G, MAGENTA_B)),
@@ -505,13 +505,13 @@ fn render_help_screen(frame: &mut Frame, app: &mut App, area: Rect) {
             ]),
             Line::from(vec![
                 Span::from("Run ").style(DEFAULT_TEXT_STYLE),
-                Span::from("$H5INSPECT_POST [file] [dataset_or_group]").style(
+                Span::from("$H5INSPECT_POST").style(
                     Style::new()
                         .fg(ratatui::style::palette::material::BLUE_GRAY.c200)
                         .bg(ratatui::style::palette::material::GRAY.c800)
                         .add_modifier(Modifier::BOLD),
                 ),
-                Span::from(":   ").style(DEFAULT_TEXT_STYLE),
+                Span::from(":                    ").style(DEFAULT_TEXT_STYLE),
                 Span::from("i").style(KEY_BINDING_STYLE),
             ]),
         ])
