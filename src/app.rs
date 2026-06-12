@@ -15,6 +15,8 @@ use core::panic;
 use crossterm::event::{KeyCode, KeyModifiers};
 use dirs;
 use log;
+use nix::sys::wait::waitpid;
+use nix::unistd::{fork, ForkResult};
 use ratatui::layout::{Position, Rect};
 use std::collections::HashMap;
 use std::fs;
@@ -779,34 +781,64 @@ impl App {
                     .await
                     .expect("Semaphore should not be closed");
 
-                log::debug!("Spawning analysis process for dataset {}", &dataset_path);
-                let result = tokio::process::Command::new(std::env::current_exe().unwrap())
-                    .arg(&file_path)
-                    .arg("--analyze-dataset")
-                    .arg(&dataset_path)
-                    .output()
-                    .await;
-                log::debug!("Analysis process for dataset {} finished", &dataset_path);
+                log::debug!("Forking analysis process for dataset {}", &dataset_path);
+
+                let (tx, rx) = ipc_channel::ipc::channel::<AnalysisResult>()
+                    .expect("Failed to create ipc-channel");
+
+                let file_path_buf = std::path::PathBuf::from(&file_path);
+                let dataset_path_clone = dataset_path.clone();
+
+                let result = tokio::task::spawn_blocking(move || {
+                    match unsafe { fork() } {
+                        Ok(ForkResult::Parent { child }) => {
+                            // Drop parent's copy of sender
+                            drop(tx);
+
+                            // Wait for the child to send back the analysis results
+                            let msg_res = rx.recv();
+
+                            // Reap the child process to avoid zombie processes
+                            let _ = waitpid(child, None);
+
+                            match msg_res {
+                                Ok(analysis) => Ok(analysis),
+                                Err(e) => Err(format!("IPC receive failed: {:?}", e)),
+                            }
+                        }
+                        Ok(ForkResult::Child) => {
+                            // Disable logging in the child process to avoid locks and output corruption
+                            log::set_max_level(log::LevelFilter::Off);
+
+                            // Drop child's copy of receiver
+                            drop(rx);
+
+                            // Perform the analysis
+                            let res = crate::analysis::hdf5_dataset_analysis_from_path(
+                                &file_path_buf,
+                                &dataset_path_clone,
+                            );
+
+                            let processed_analysis = match res {
+                                Ok(analysis) => analysis,
+                                Err(e) => AnalysisResult::Failed(e.to_string()),
+                            };
+
+                            // Send back the results
+                            let _ = tx.send(processed_analysis);
+
+                            // Exit immediately to prevent child from running any other logic
+                            std::process::exit(0);
+                        }
+                        Err(e) => Err(format!("Fork failed: {}", e)),
+                    }
+                })
+                .await;
 
                 let processed_analysis = match result {
-                    Ok(output) => {
-                        if output.status.success() {
-                            // Parse the JSON output from the analysis process
-                            match serde_json::from_slice::<AnalysisResult>(&output.stdout) {
-                                Ok(analysis) => analysis,
-                                Err(e) => AnalysisResult::Failed(format!(
-                                    "Failed to parse analysis result: {}",
-                                    e
-                                )),
-                            }
-                        } else {
-                            let stderr = String::from_utf8_lossy(&output.stderr);
-                            AnalysisResult::Failed(format!("Analysis process failed: {}", stderr))
-                        }
-                    }
-                    Err(e) => {
-                        AnalysisResult::Failed(format!("Failed to spawn analysis process: {}", e))
-                    }
+                    Ok(Ok(analysis)) => analysis,
+                    Ok(Err(err_msg)) => AnalysisResult::Failed(err_msg),
+                    Err(join_err) => AnalysisResult::Failed(format!("Task panic: {}", join_err)),
                 };
 
                 if let Ok(mut info_dict) = thread_arc.lock() {
@@ -818,9 +850,7 @@ impl App {
         }
     }
 
-    pub async fn run(
-        mut self,
-    ) -> Result<AppFinishingState, Box<dyn std::error::Error>> {
+    pub async fn run(mut self) -> Result<AppFinishingState, Box<dyn std::error::Error>> {
         let h5_file = h5_utils::open_file(&self.h5_file_path)?;
 
         let (sender, receiver) = tokio::sync::mpsc::unbounded_channel();
@@ -870,7 +900,10 @@ impl App {
                         KeyPressResult::DontRedraw => false,
                         KeyPressResult::RunPostCommand(post_cmd, ds_path) => {
                             // Pause the TUI: disable raw mode and leave alternate screen
-                            crossterm::execute!(std::io::stdout(), crossterm::event::DisableMouseCapture)?;
+                            crossterm::execute!(
+                                std::io::stdout(),
+                                crossterm::event::DisableMouseCapture
+                            )?;
                             ratatui::restore();
 
                             // Run the post command
@@ -913,8 +946,11 @@ impl App {
                                 }
                             }
 
-                             terminal = ratatui::init();
-                            crossterm::execute!(std::io::stdout(), crossterm::event::EnableMouseCapture)?;
+                            terminal = ratatui::init();
+                            crossterm::execute!(
+                                std::io::stdout(),
+                                crossterm::event::EnableMouseCapture
+                            )?;
 
                             true
                         }
@@ -1066,6 +1102,59 @@ impl App {
                 }
             }
             _ => false,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::h5_utils;
+    use std::path::PathBuf;
+
+    #[test]
+    fn test_fork_analysis() {
+        // Ensure the dummy file exists
+        let path = PathBuf::from("dummy.h5");
+        if !path.exists() {
+            h5_utils::generate_dummy_file().unwrap();
+        }
+
+        // Run the fork and channel analysis manually
+        let (tx, rx) =
+            ipc_channel::ipc::channel::<AnalysisResult>().expect("Failed to create ipc-channel");
+
+        let dataset_path = "sums_of_bernoulli".to_string();
+        let file_path = path.clone();
+
+        match unsafe { fork() } {
+            Ok(ForkResult::Parent { child }) => {
+                drop(tx);
+                let msg_res = rx.recv().expect("Failed to receive from child");
+                let _ = waitpid(child, None);
+
+                match msg_res {
+                    AnalysisResult::Stats(stats, _) => {
+                        assert!(!stats.is_empty());
+                        let mean_stat = stats.iter().find(|(k, _)| k == "Mean");
+                        assert!(mean_stat.is_some());
+                    }
+                    other => std::panic!("Expected Stats, got {:?}", other),
+                }
+            }
+            Ok(ForkResult::Child) => {
+                log::set_max_level(log::LevelFilter::Off);
+                drop(rx);
+                let res =
+                    crate::analysis::hdf5_dataset_analysis_from_path(&file_path, &dataset_path);
+                let processed_analysis = match res {
+                    Ok(analysis) => analysis,
+                    Err(e) => AnalysisResult::Failed(e.to_string()),
+                };
+                let _ = tx.send(processed_analysis);
+                std::process::exit(0);
+            }
+            Err(e) => std::panic!("Fork failed: {}", e),
         }
     }
 }

@@ -11,7 +11,7 @@ use ratatui::style::Modifier;
 use ratatui::text::{Line, Span, Text};
 use ratatui::{
     layout::{Constraint, Flex, Layout, Position, Rect},
-    style::{Color, Style},
+    style::{Color, Style, Stylize},
     widgets::{
         Block, BorderType, Borders, Cell, Clear, Paragraph, Row, Scrollbar, ScrollbarOrientation,
         ScrollbarState, Table, TableState, Wrap,

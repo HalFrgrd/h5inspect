@@ -1,10 +1,7 @@
 use crate::app::App;
 use clap;
 use color_eyre::Result;
-use ratatui;
-use serde_json;
 use std::error::Error;
-use std::path::PathBuf;
 use tui_logger;
 
 mod analysis;
@@ -58,13 +55,6 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .required_unless_present("generate-dummy-file"),
         )
         .arg(
-            clap::Arg::new("analyze-dataset")
-                .long("analyze-dataset")
-                .value_name("DATASET")
-                .help("Run analysis on a specific dataset and output JSON result")
-                .required(false),
-        )
-        .arg(
             clap::Arg::new("logs")
                 .long("logs")
                 .value_name("FILE")
@@ -95,25 +85,18 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     initialize_logger(matches.get_one::<String>("logs"))?;
 
-    if let Some(dataset_path) = matches.get_one::<String>("analyze-dataset") {
-        // Check if we're in analysis mode
-        // Run analysis and output JSON
-        analyze_dataset(&h5_file_path, dataset_path)
-    } else {
-        log::info!("Starting app");
+    log::info!("Starting app");
 
-        let runtime = build_runtime();
+    let runtime = build_runtime();
 
-        color_eyre::install()?;
-        let app = App::new(h5_file_path.clone());
+    color_eyre::install()?;
+    let app = App::new(h5_file_path.clone());
 
-        let res = runtime.block_on(app.run());
+    let res = runtime.block_on(app.run());
 
-
-        match res {
-            Ok(_) => Ok(()),
-            Err(e) => Err(e),
-        }
+    match res {
+        Ok(_) => Ok(()),
+        Err(e) => Err(e),
     }
 }
 
@@ -131,23 +114,6 @@ fn initialize_logger(log_file_path: Option<&String>) -> Result<(), Box<dyn Error
         tui_logger::set_log_file(tui_logger::TuiLoggerFile::new(log_file_path));
     }
     Ok(())
-}
-
-fn analyze_dataset(h5_file_path: &PathBuf, dataset_path: &str) -> Result<(), Box<dyn Error>> {
-    // Run analysis and output JSON
-    match analysis::hdf5_dataset_analysis_from_path(&h5_file_path, dataset_path) {
-        Ok(result) => {
-            let json_output = serde_json::to_string(&result)?;
-            println!("{}", json_output);
-            return Ok(());
-        }
-        Err(e) => {
-            let error_result = analysis::AnalysisResult::Failed(e.to_string());
-            let json_output = serde_json::to_string(&error_result)?;
-            println!("{}", json_output);
-            std::process::exit(1);
-        }
-    }
 }
 
 fn build_runtime() -> tokio::runtime::Runtime {
