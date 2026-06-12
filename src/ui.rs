@@ -107,6 +107,7 @@ where
         &self,
         mode: SelectionMode,
         hovered_path: Option<&[IdT]>,
+        copied_indicator: Option<&(Vec<IdT>, std::time::Instant)>,
         current_path: &mut Vec<IdT>,
     ) -> WidgetTreeItem<'_, IdT> {
         let children: Vec<_> = self
@@ -114,13 +115,19 @@ where
             .iter()
             .map(|child| {
                 current_path.push(child.id().clone());
-                let item = child.into_tree_item(mode, hovered_path, current_path);
+                let item = child.into_tree_item(mode, hovered_path, copied_indicator, current_path);
                 current_path.pop();
                 item
             })
             .collect();
 
         let is_hovered = hovered_path == Some(current_path.as_slice());
+
+        let is_copied = if let Some((copied_path, time)) = copied_indicator {
+            copied_path == current_path && time.elapsed().as_millis() < 500
+        } else {
+            false
+        };
 
         let matching_indices = self.matching_indices();
         let mut formatted_text = Line::from(
@@ -133,7 +140,9 @@ where
                     } else {
                         Span::raw(c.to_string())
                     };
-                    if is_hovered {
+                    if is_copied {
+                        span = span.bg(Color::Rgb(46, 125, 50)).fg(Color::White);
+                    } else if is_hovered {
                         span = span.bg(Color::Gray);
                         if !matching_indices.contains(&i) {
                             span = span.fg(Color::Black);
@@ -150,10 +159,22 @@ where
                 format!(" ({})", num_children),
                 get_style(Styles::Magenta, mode),
             );
-            if is_hovered {
+            if is_copied {
+                span = span.bg(Color::Rgb(46, 125, 50)).fg(Color::White);
+            } else if is_hovered {
                 span = span.bg(Color::Gray).fg(Color::Black);
             }
             formatted_text.push_span(span);
+        }
+
+        if is_copied {
+            formatted_text.push_span(Span::styled(
+                " [Copied!]",
+                Style::new()
+                    .bg(Color::Rgb(46, 125, 50))
+                    .fg(Color::White)
+                    .add_modifier(Modifier::BOLD),
+            ));
         }
 
         WidgetTreeItem::new(self.id(), formatted_text, children)
@@ -340,8 +361,13 @@ fn render_tree(frame: &mut Frame, app: &mut App, area: Rect) {
             Some(filtered_tree) => {
                 let mut current_path = vec![filtered_tree.id().clone()];
                 let hovered_path = app.hovered_node.as_deref();
-                let filtered_items =
-                    [filtered_tree.into_tree_item(app.mode, hovered_path, &mut current_path)];
+                let copied_indicator = app.copied_indicator.as_ref();
+                let filtered_items = [filtered_tree.into_tree_item(
+                    app.mode,
+                    hovered_path,
+                    copied_indicator,
+                    &mut current_path,
+                )];
                 let tree_widget = WidgetTreeRoot::new(&filtered_items)
                     .expect("all item identifiers are unique")
                     .style(get_style(Styles::DefaultText, app.mode))

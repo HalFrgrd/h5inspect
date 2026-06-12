@@ -87,6 +87,7 @@ pub struct App {
     pub hovered_node: Option<Vec<NodeIdT>>,
     pub last_click_time: Option<Instant>,
     pub last_clicked_node: Option<Vec<NodeIdT>>,
+    pub copied_indicator: Option<(Vec<NodeIdT>, std::time::Instant)>,
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -255,6 +256,7 @@ impl App {
             hovered_node: None,
             last_click_time: None,
             last_clicked_node: None,
+            copied_indicator: None,
         }
     }
 
@@ -450,6 +452,7 @@ impl App {
                     print!("{}", osc52_seq);
                     let _ = std::io::stdout().flush();
                     log::info!("Copied path to clipboard: {}", path);
+                    self.copied_indicator = Some((arg.clone(), std::time::Instant::now()));
                 }
             } else {
                 // Single click: toggle and select
@@ -560,6 +563,7 @@ impl App {
                     print!("{}", osc52_seq);
                     let _ = std::io::stdout().flush();
                     log::info!("Copied path to clipboard: {}", path);
+                    self.copied_indicator = Some((self.tree_state.selected().to_vec(), std::time::Instant::now()));
                 }
             }
             KeyCode::Char('g') => {
