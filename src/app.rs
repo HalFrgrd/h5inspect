@@ -73,6 +73,8 @@ pub struct App {
     pub show_logs: bool,
     pub object_info_scroll_state: u16,
     last_object_info_area: Rect,
+    pub last_object_info_table_area: Rect,
+    pub object_info_row_keys: Vec<String>,
     last_tree_area: Rect,
     last_search_query_area: Rect,
     last_help_screen_area: Rect,
@@ -244,6 +246,8 @@ impl App {
             show_logs: false, //cfg!(debug_assertions),
             object_info_scroll_state: 0,
             last_object_info_area: Rect::new(0, 0, 0, 0),
+            last_object_info_table_area: Rect::new(0, 0, 0, 0),
+            object_info_row_keys: Vec::new(),
             last_tree_area: Rect::new(0, 0, 0, 0),
             last_search_query_area: Rect::new(0, 0, 0, 0),
             last_help_screen_area: Rect::new(0, 0, 0, 0),
@@ -485,7 +489,7 @@ impl App {
 
                 let selected = self.tree_state.selected().to_vec();
                 if !selected.is_empty() {
-                    if let Some((info, histogram_data)) = self.get_text_for(&selected) {
+                    if let Some((info, _histogram_data)) = self.get_text_for(&selected) {
                         if is_on_border {
                             // Double click on border: copy all text
                             let mut text_to_copy = String::new();
@@ -496,53 +500,18 @@ impl App {
                             self.copied_object_info_indicator =
                                 Some(("_all".to_string(), std::time::Instant::now()));
                         } else {
-                            // Check if inside table area
-                            let inner_area = area.inner(ratatui::layout::Margin::new(1, 1));
-                            let layout = if histogram_data.is_some() {
-                                ratatui::layout::Layout::vertical([
-                                    ratatui::layout::Constraint::Percentage(30),
-                                    ratatui::layout::Constraint::Percentage(70),
-                                ])
-                            } else {
-                                ratatui::layout::Layout::vertical([
-                                    ratatui::layout::Constraint::Percentage(100),
-                                    ratatui::layout::Constraint::Percentage(0),
-                                ])
-                            }
-                            .split(inner_area);
-
-                            let table_area = layout[0];
+                            let table_area = self.last_object_info_table_area;
                             if table_area.contains(position) {
                                 let clicked_row_idx = (row - table_area.y) as usize
                                     + self.object_info_scroll_state as usize;
-                                let key_col_width = 26;
-                                let data_col_width =
-                                    std::cmp::max(area.width.saturating_sub(key_col_width + 3), 2);
-
-                                let mut current_row_idx = 0;
-                                for (k, v) in info {
-                                    let num_subrows: usize = v
-                                        .split('\n')
-                                        .map(|line| {
-                                            let chars_len = line.chars().count();
-                                            if chars_len == 0 {
-                                                1
-                                            } else {
-                                                (chars_len + data_col_width as usize - 1)
-                                                    / data_col_width as usize
-                                            }
-                                        })
-                                        .sum();
-
-                                    if clicked_row_idx >= current_row_idx
-                                        && clicked_row_idx < current_row_idx + num_subrows
+                                if let Some(k) = self.object_info_row_keys.get(clicked_row_idx) {
+                                    if let Some(v) =
+                                        info.iter().find(|(key, _)| key == k).map(|(_, val)| val)
                                     {
-                                        self.copy_to_clipboard(&v);
+                                        self.copy_to_clipboard(v);
                                         self.copied_object_info_indicator =
                                             Some((k.clone(), std::time::Instant::now()));
-                                        break;
                                     }
-                                    current_row_idx += num_subrows;
                                 }
                             }
                         }
@@ -876,6 +845,10 @@ impl App {
 
     pub fn set_last_object_info_area(&mut self, area: Rect) {
         self.last_object_info_area = area;
+    }
+
+    pub fn set_last_object_info_table_area(&mut self, area: Rect) {
+        self.last_object_info_table_area = area;
     }
 
     pub fn set_last_tree_area(&mut self, area: Rect) {
@@ -1215,56 +1188,11 @@ impl App {
                 || mouse.row == area.y + area.height.saturating_sub(1);
 
             if !is_on_border {
-                let selected = self.tree_state.selected().to_vec();
-                if !selected.is_empty() {
-                    if let Some((info, histogram_data)) = self.get_text_for(&selected) {
-                        let inner_area = area.inner(ratatui::layout::Margin::new(1, 1));
-                        let layout = if histogram_data.is_some() {
-                            ratatui::layout::Layout::vertical([
-                                ratatui::layout::Constraint::Percentage(30),
-                                ratatui::layout::Constraint::Percentage(70),
-                            ])
-                        } else {
-                            ratatui::layout::Layout::vertical([
-                                ratatui::layout::Constraint::Percentage(100),
-                                ratatui::layout::Constraint::Percentage(0),
-                            ])
-                        }
-                        .split(inner_area);
-
-                        let table_area = layout[0];
-                        if table_area.contains(position) {
-                            let clicked_row_idx = (mouse.row - table_area.y) as usize
-                                + self.object_info_scroll_state as usize;
-                            let key_col_width = 26;
-                            let data_col_width =
-                                std::cmp::max(area.width.saturating_sub(key_col_width + 3), 2);
-
-                            let mut current_row_idx = 0;
-                            for (k, v) in info {
-                                let num_subrows: usize = v
-                                    .split('\n')
-                                    .map(|line| {
-                                        let chars_len = line.chars().count();
-                                        if chars_len == 0 {
-                                            1
-                                        } else {
-                                            (chars_len + data_col_width as usize - 1)
-                                                / data_col_width as usize
-                                        }
-                                    })
-                                    .sum();
-
-                                if clicked_row_idx >= current_row_idx
-                                    && clicked_row_idx < current_row_idx + num_subrows
-                                {
-                                    hovered_key = Some(k.clone());
-                                    break;
-                                }
-                                current_row_idx += num_subrows;
-                            }
-                        }
-                    }
+                let table_area = self.last_object_info_table_area;
+                if table_area.contains(position) {
+                    let clicked_row_idx = (mouse.row - table_area.y) as usize
+                        + self.object_info_scroll_state as usize;
+                    hovered_key = self.object_info_row_keys.get(clicked_row_idx).cloned();
                 }
             }
         }

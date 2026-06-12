@@ -249,6 +249,7 @@ fn render_object_info(frame: &mut Frame, app: &mut App, area: Rect) {
     frame.render_widget(&object_info, area);
 
     let mut rows = vec![];
+    app.object_info_row_keys.clear();
 
     let key_col_width = 26;
     let table_widths = [Constraint::Min(key_col_width), Constraint::Percentage(100)];
@@ -277,14 +278,13 @@ fn render_object_info(frame: &mut Frame, app: &mut App, area: Rect) {
 
                 let subrows = v
                     .split('\n')
-                    .map(|line| {
+                    .flat_map(|line| {
                         line.chars()
                             .collect::<Vec<_>>()
                             .chunks(data_col_width.into())
                             .map(|chunk| chunk.iter().collect::<String>())
                             .collect::<Vec<_>>()
                     })
-                    .flatten()
                     .collect::<Vec<_>>();
 
                 let total_subrows = subrows.len();
@@ -311,6 +311,7 @@ fn render_object_info(frame: &mut Frame, app: &mut App, area: Rect) {
                         get_style(Styles::Magenta, app.mode)
                     };
 
+                    app.object_info_row_keys.push(k.to_string());
                     rows.push(Row::new([
                         Cell::from(Text::from(sub_row_k.to_owned()).style(key_style)),
                         Cell::from(Text::from(val_text).style(val_style)),
@@ -328,6 +329,7 @@ fn render_object_info(frame: &mut Frame, app: &mut App, area: Rect) {
     .split(area.inner(Margin::new(1, 1)));
 
     let table_area = layout[0];
+    app.set_last_object_info_table_area(table_area);
     let hist_area = layout[1];
 
     let num_lines_when_rendered: u16 = rows.len().try_into().unwrap();
