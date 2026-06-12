@@ -103,12 +103,24 @@ impl<IdT> tree::TreeNode<IdT>
 where
     IdT: Eq + std::hash::Hash + Clone + std::fmt::Debug,
 {
-    pub fn into_tree_item(&self, mode: SelectionMode) -> WidgetTreeItem<'_, IdT> {
+    pub fn into_tree_item(
+        &self,
+        mode: SelectionMode,
+        hovered_path: Option<&[IdT]>,
+        current_path: &mut Vec<IdT>,
+    ) -> WidgetTreeItem<'_, IdT> {
         let children: Vec<_> = self
             .children()
             .iter()
-            .map(|child| child.into_tree_item(mode))
+            .map(|child| {
+                current_path.push(child.id().clone());
+                let item = child.into_tree_item(mode, hovered_path, current_path);
+                current_path.pop();
+                item
+            })
             .collect();
+
+        let is_hovered = hovered_path == Some(current_path.as_slice());
 
         let matching_indices = self.matching_indices();
         let mut formatted_text = Line::from(
@@ -116,21 +128,32 @@ where
                 .chars()
                 .enumerate()
                 .map(|(i, c)| {
-                    if matching_indices.contains(&i) {
+                    let mut span = if matching_indices.contains(&i) {
                         Span::styled(c.to_string(), get_style(Styles::SearchCharMatch, mode))
                     } else {
                         Span::raw(c.to_string())
+                    };
+                    if is_hovered {
+                        span = span.bg(Color::Gray);
+                        if !matching_indices.contains(&i) {
+                            span = span.fg(Color::Black);
+                        }
                     }
+                    span
                 })
                 .collect::<Vec<_>>(),
         );
 
         let num_children = self.recursive_num_children();
         if num_children > 0 {
-            formatted_text.push_span(Span::styled(
+            let mut span = Span::styled(
                 format!(" ({})", num_children),
                 get_style(Styles::Magenta, mode),
-            ));
+            );
+            if is_hovered {
+                span = span.bg(Color::Gray).fg(Color::Black);
+            }
+            formatted_text.push_span(span);
         }
 
         WidgetTreeItem::new(self.id(), formatted_text, children)
@@ -315,7 +338,10 @@ fn render_tree(frame: &mut Frame, app: &mut App, area: Rect) {
     match &app.tree {
         Some(_) => match &app.filtered_tree {
             Some(filtered_tree) => {
-                let filtered_items = [filtered_tree.into_tree_item(app.mode)];
+                let mut current_path = vec![filtered_tree.id().clone()];
+                let hovered_path = app.hovered_node.as_deref();
+                let filtered_items =
+                    [filtered_tree.into_tree_item(app.mode, hovered_path, &mut current_path)];
                 let tree_widget = WidgetTreeRoot::new(&filtered_items)
                     .expect("all item identifiers are unique")
                     .style(get_style(Styles::DefaultText, app.mode))

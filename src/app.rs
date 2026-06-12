@@ -84,6 +84,7 @@ pub struct App {
     pub tree_width_percentage: u16,
     pub is_dragging_divider: bool,
     last_redraw_from_scroll: Instant,
+    pub hovered_node: Option<Vec<NodeIdT>>,
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -249,6 +250,7 @@ impl App {
             tree_width_percentage: 50,
             is_dragging_divider: false,
             last_redraw_from_scroll: Instant::now(),
+            hovered_node: None,
         }
     }
 
@@ -1028,7 +1030,20 @@ impl App {
 
     fn handle_mouse(&mut self, mouse: crossterm::event::MouseEvent) -> bool {
         log::debug!("mouse event: {:?}", mouse);
-        match mouse.kind {
+
+        // Update hovered node
+        let position = Position::new(mouse.column, mouse.row);
+        let new_hover = if self.last_tree_area.contains(position) {
+            self.tree_state.rendered_at(position).map(|id| id.to_vec())
+        } else {
+            None
+        };
+        let hover_changed = self.hovered_node != new_hover;
+        self.hovered_node = new_hover;
+
+        let needs_redraw = hover_changed;
+
+        let match_result = match mouse.kind {
             MouseEventKind::Down(MouseButton::Left) => {
                 self.on_click(mouse.column, mouse.row);
                 true
@@ -1102,7 +1117,9 @@ impl App {
                 }
             }
             _ => false,
-        }
+        };
+
+        needs_redraw || match_result
     }
 }
 
