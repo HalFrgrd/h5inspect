@@ -108,6 +108,7 @@ where
         mode: SelectionMode,
         hovered_path: Option<&[IdT]>,
         copied_indicator: Option<&(Vec<IdT>, std::time::Instant)>,
+        selected_path: &[IdT],
         current_path: &mut Vec<IdT>,
     ) -> WidgetTreeItem<'_, IdT> {
         let children: Vec<_> = self
@@ -115,13 +116,14 @@ where
             .iter()
             .map(|child| {
                 current_path.push(child.id().clone());
-                let item = child.into_tree_item(mode, hovered_path, copied_indicator, current_path);
+                let item = child.into_tree_item(mode, hovered_path, copied_indicator, selected_path, current_path);
                 current_path.pop();
                 item
             })
             .collect();
 
-        let is_hovered = hovered_path == Some(current_path.as_slice());
+        let is_selected = selected_path == current_path.as_slice();
+        let is_hovered = hovered_path == Some(current_path.as_slice()) && !is_selected;
 
         let is_copied = if let Some((copied_path, time)) = copied_indicator {
             copied_path == current_path && time.elapsed().as_millis() < 500
@@ -362,10 +364,12 @@ fn render_tree(frame: &mut Frame, app: &mut App, area: Rect) {
                 let mut current_path = vec![filtered_tree.id().clone()];
                 let hovered_path = app.hovered_node.as_deref();
                 let copied_indicator = app.copied_indicator.as_ref();
+                let selected_path = app.tree_state.selected();
                 let filtered_items = [filtered_tree.into_tree_item(
                     app.mode,
                     hovered_path,
                     copied_indicator,
+                    selected_path,
                     &mut current_path,
                 )];
                 let tree_widget = WidgetTreeRoot::new(&filtered_items)
