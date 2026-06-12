@@ -116,7 +116,13 @@ where
             .iter()
             .map(|child| {
                 current_path.push(child.id().clone());
-                let item = child.into_tree_item(mode, hovered_path, copied_indicator, selected_path, current_path);
+                let item = child.into_tree_item(
+                    mode,
+                    hovered_path,
+                    copied_indicator,
+                    selected_path,
+                    current_path,
+                );
                 current_path.pop();
                 item
             })
@@ -185,8 +191,24 @@ where
 }
 
 fn render_object_info(frame: &mut Frame, app: &mut App, area: Rect) {
+    let is_copied_all = if let Some((copied_key, time)) = &app.copied_object_info_indicator {
+        copied_key == "_all" && time.elapsed().as_millis() < 500
+    } else {
+        false
+    };
+
     let object_info = Block::new()
-        .title("Object info")
+        .title(if is_copied_all {
+            Line::from(vec![
+                Span::raw("Object info"),
+                Span::styled(
+                    " [Copied!]",
+                    Style::new().fg(Color::Green).add_modifier(Modifier::BOLD),
+                ),
+            ])
+        } else {
+            Line::from("Object info")
+        })
         .title_top(Line::from("Help screen (type '?')").right_aligned())
         .title_bottom({
             let num_active_tasks = app.get_num_active_data_analysis_tasks();
@@ -214,7 +236,11 @@ fn render_object_info(frame: &mut Frame, app: &mut App, area: Rect) {
         })
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
-        .border_style(if app.mode == SelectionMode::ObjectInfoInspecting {
+        .border_style(if is_copied_all {
+            Style::default()
+                .fg(Color::Green)
+                .add_modifier(Modifier::BOLD)
+        } else if app.mode == SelectionMode::ObjectInfoInspecting {
             get_style(Styles::BorderHighlight, app.mode)
         } else {
             get_style(Styles::BorderDefault, app.mode)
@@ -236,7 +262,21 @@ fn render_object_info(frame: &mut Frame, app: &mut App, area: Rect) {
         if let Some((info, hist_data_opt)) = info {
             histogram_data = hist_data_opt;
             info.iter().for_each(|(k, v)| {
-                v.split('\n')
+                let is_copied_row =
+                    if let Some((copied_key, time)) = &app.copied_object_info_indicator {
+                        copied_key == k && time.elapsed().as_millis() < 500
+                    } else {
+                        false
+                    };
+
+                let is_hovered_row = if let Some(hovered_key) = &app.hovered_object_info_key {
+                    hovered_key == k && !is_copied_row
+                } else {
+                    false
+                };
+
+                let subrows = v
+                    .split('\n')
                     .map(|line| {
                         line.chars()
                             .collect::<Vec<_>>()
@@ -245,20 +285,37 @@ fn render_object_info(frame: &mut Frame, app: &mut App, area: Rect) {
                             .collect::<Vec<_>>()
                     })
                     .flatten()
-                    .enumerate()
-                    .for_each(|(i, subrow)| {
-                        let sub_row_k = if i == 0 { k } else { "" };
-                        rows.push(Row::new([
-                            Cell::from(
-                                Text::from(sub_row_k.to_owned())
-                                    .style(get_style(Styles::DefaultText, app.mode)),
-                            ),
-                            Cell::from(
-                                Text::from(subrow.to_owned())
-                                    .style(get_style(Styles::Magenta, app.mode)),
-                            ),
-                        ]));
-                    });
+                    .collect::<Vec<_>>();
+
+                let total_subrows = subrows.len();
+
+                subrows.into_iter().enumerate().for_each(|(i, subrow)| {
+                    let sub_row_k = if i == 0 { k } else { "" };
+
+                    let key_style = get_style(Styles::DefaultText, app.mode);
+
+                    let val_text = if is_copied_row && i == total_subrows - 1 {
+                        format!("{} [Copied!]", subrow)
+                    } else {
+                        subrow.clone()
+                    };
+
+                    let val_style = if is_copied_row {
+                        Style::new()
+                            .bg(Color::Rgb(46, 125, 50))
+                            .fg(Color::White)
+                            .add_modifier(Modifier::BOLD)
+                    } else if is_hovered_row {
+                        Style::new().bg(Color::Gray).fg(Color::Black)
+                    } else {
+                        get_style(Styles::Magenta, app.mode)
+                    };
+
+                    rows.push(Row::new([
+                        Cell::from(Text::from(sub_row_k.to_owned()).style(key_style)),
+                        Cell::from(Text::from(val_text).style(val_style)),
+                    ]));
+                });
             });
         }
     }
@@ -372,10 +429,22 @@ fn render_tree(frame: &mut Frame, app: &mut App, area: Rect) {
                     selected_path,
                     &mut current_path,
                 )];
+                let is_selected_copied = if let Some((copied_path, time)) = copied_indicator {
+                    copied_path.as_slice() == selected_path && time.elapsed().as_millis() < 500
+                } else {
+                    false
+                };
+
+                let highlight_style = if is_selected_copied {
+                    Style::new().bg(Color::Rgb(46, 125, 50)).fg(Color::White)
+                } else {
+                    get_style(Styles::TreeItemHighlight, app.mode)
+                };
+
                 let tree_widget = WidgetTreeRoot::new(&filtered_items)
                     .expect("all item identifiers are unique")
                     .style(get_style(Styles::DefaultText, app.mode))
-                    .highlight_style(get_style(Styles::TreeItemHighlight, app.mode))
+                    .highlight_style(highlight_style)
                     .block(tree_block)
                     .experimental_scrollbar(Some(
                         Scrollbar::new(ScrollbarOrientation::VerticalRight)

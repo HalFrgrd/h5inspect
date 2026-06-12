@@ -86,8 +86,10 @@ pub struct App {
     last_redraw_from_scroll: Instant,
     pub hovered_node: Option<Vec<NodeIdT>>,
     pub last_click_time: Option<Instant>,
-    pub last_clicked_node: Option<Vec<NodeIdT>>,
+    pub last_click_position: Option<Position>,
     pub copied_indicator: Option<(Vec<NodeIdT>, std::time::Instant)>,
+    pub copied_object_info_indicator: Option<(String, std::time::Instant)>,
+    pub hovered_object_info_key: Option<String>,
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -255,8 +257,10 @@ impl App {
             last_redraw_from_scroll: Instant::now(),
             hovered_node: None,
             last_click_time: None,
-            last_clicked_node: None,
+            last_click_position: None,
             copied_indicator: None,
+            copied_object_info_indicator: None,
+            hovered_object_info_key: None,
         }
     }
 
@@ -396,17 +400,43 @@ impl App {
         }
     }
 
+    fn copy_to_clipboard(&self, text: &str) {
+        use crossterm::{clipboard::CopyToClipboard, QueueableCommand};
+        use std::io::Write;
+        let mut stdout = std::io::stdout();
+        if let Err(e) = stdout.queue(CopyToClipboard::to_clipboard_from(text.to_string())) {
+            log::error!("Failed to copy to clipboard via crossterm: {:?}", e);
+        } else if let Err(e) = stdout.flush() {
+            log::error!("Failed to flush stdout after clipboard copy: {:?}", e);
+        } else {
+            log::info!(
+                "Copied content to clipboard via OSC 52 (length: {})",
+                text.len()
+            );
+        }
+    }
+
     fn on_click(&mut self, column: u16, row: u16) {
         let position = Position::new(column, row);
 
         log::debug!("clicked at {:?}", position);
+
+        let is_double_click = if let (Some(last_pos), Some(last_time)) =
+            (self.last_click_position, self.last_click_time)
+        {
+            last_pos.y == row && last_pos.x == column && last_time.elapsed().as_millis() < 300
+        } else {
+            false
+        };
+
+        self.last_click_position = Some(position);
+        self.last_click_time = Some(std::time::Instant::now());
 
         if self.mode == SelectionMode::HelpScreen && self.last_help_screen_area.contains(position) {
             return;
         }
 
         // Check if clicking on the divider between tree and object info
-        // The divider is at the right edge of the tree area or left edge of object info area
         let divider_column = self.last_tree_area.right();
         if column == divider_column || column == divider_column.saturating_sub(1) {
             self.is_dragging_divider = true;
@@ -415,50 +445,115 @@ impl App {
 
         if self.last_tree_area.contains(position) {
             self.mode = SelectionMode::TreeBrowsing;
-        } else if self.last_object_info_area.contains(position) {
-            self.mode = SelectionMode::ObjectInfoInspecting;
-        } else if self.last_search_query_area.contains(position) {
-            self.mode = SelectionMode::SearchQueryEditing;
+
+            if let Some(id) = self.tree_state.rendered_at(position) {
+                let arg = id.to_vec();
+                if is_double_click {
+                    // Double click: copy path to clipboard using OSC 52
+                    let path_str = self
+                        .tree
+                        .as_ref()
+                        .and_then(|tree| tree.get_selected_node(&arg))
+                        .and_then(|node| match &node.hdf5_object {
+                            Some(Hdf5Object::Dataset(dataset)) => Some(dataset.name().to_string()),
+                            Some(Hdf5Object::Group(group)) => Some(group.name().to_string()),
+                            _ => None,
+                        });
+
+                    if let Some(path) = path_str {
+                        self.copy_to_clipboard(&path);
+                        self.copied_indicator = Some((arg.clone(), std::time::Instant::now()));
+                    }
+                } else {
+                    // Single click: toggle and select
+                    self.tree_state.toggle(arg.clone());
+                    self.tree_state.select(arg);
+                }
+            }
+            return;
         }
 
-        if let Some(id) = self.tree_state.rendered_at(position) {
-            let arg = id.to_vec();
-
-            let is_double_click = if let (Some(last_id), Some(last_time)) = (&self.last_clicked_node, self.last_click_time) {
-                last_id == &arg && last_time.elapsed().as_millis() < 300
-            } else {
-                false
-            };
-
-            self.last_clicked_node = Some(arg.clone());
-            self.last_click_time = Some(std::time::Instant::now());
+        if self.last_object_info_area.contains(position) {
+            self.mode = SelectionMode::ObjectInfoInspecting;
 
             if is_double_click {
-                // Double click: copy path to clipboard using OSC 52
-                let path_str = self
-                    .tree
-                    .as_ref()
-                    .and_then(|tree| tree.get_selected_node(&arg))
-                    .and_then(|node| match &node.hdf5_object {
-                        Some(Hdf5Object::Dataset(dataset)) => Some(dataset.name().to_string()),
-                        Some(Hdf5Object::Group(group)) => Some(group.name().to_string()),
-                        _ => None,
-                    });
+                let area = self.last_object_info_area;
+                let is_on_border = column == area.x
+                    || column == area.x + area.width.saturating_sub(1)
+                    || row == area.y
+                    || row == area.y + area.height.saturating_sub(1);
 
-                if let Some(path) = path_str {
-                    use base64::{Engine as _, engine::general_purpose::STANDARD};
-                    let encoded = STANDARD.encode(path.as_bytes());
-                    let osc52_seq = format!("\x1b]52;c;{}\x07", encoded);
-                    print!("{}", osc52_seq);
-                    let _ = std::io::stdout().flush();
-                    log::info!("Copied path to clipboard: {}", path);
-                    self.copied_indicator = Some((arg.clone(), std::time::Instant::now()));
+                let selected = self.tree_state.selected().to_vec();
+                if !selected.is_empty() {
+                    if let Some((info, histogram_data)) = self.get_text_for(&selected) {
+                        if is_on_border {
+                            // Double click on border: copy all text
+                            let mut text_to_copy = String::new();
+                            for (k, v) in info {
+                                text_to_copy.push_str(&format!("{}: {}\n", k, v));
+                            }
+                            self.copy_to_clipboard(&text_to_copy);
+                            self.copied_object_info_indicator =
+                                Some(("_all".to_string(), std::time::Instant::now()));
+                        } else {
+                            // Check if inside table area
+                            let inner_area = area.inner(ratatui::layout::Margin::new(1, 1));
+                            let layout = if histogram_data.is_some() {
+                                ratatui::layout::Layout::vertical([
+                                    ratatui::layout::Constraint::Percentage(30),
+                                    ratatui::layout::Constraint::Percentage(70),
+                                ])
+                            } else {
+                                ratatui::layout::Layout::vertical([
+                                    ratatui::layout::Constraint::Percentage(100),
+                                    ratatui::layout::Constraint::Percentage(0),
+                                ])
+                            }
+                            .split(inner_area);
+
+                            let table_area = layout[0];
+                            if table_area.contains(position) {
+                                let clicked_row_idx = (row - table_area.y) as usize
+                                    + self.object_info_scroll_state as usize;
+                                let key_col_width = 26;
+                                let data_col_width =
+                                    std::cmp::max(area.width.saturating_sub(key_col_width + 3), 2);
+
+                                let mut current_row_idx = 0;
+                                for (k, v) in info {
+                                    let num_subrows: usize = v
+                                        .split('\n')
+                                        .map(|line| {
+                                            let chars_len = line.chars().count();
+                                            if chars_len == 0 {
+                                                1
+                                            } else {
+                                                (chars_len + data_col_width as usize - 1)
+                                                    / data_col_width as usize
+                                            }
+                                        })
+                                        .sum();
+
+                                    if clicked_row_idx >= current_row_idx
+                                        && clicked_row_idx < current_row_idx + num_subrows
+                                    {
+                                        self.copy_to_clipboard(&v);
+                                        self.copied_object_info_indicator =
+                                            Some((k.clone(), std::time::Instant::now()));
+                                        break;
+                                    }
+                                    current_row_idx += num_subrows;
+                                }
+                            }
+                        }
+                    }
                 }
-            } else {
-                // Single click: toggle and select
-                self.tree_state.toggle(arg.clone());
-                self.tree_state.select(arg);
             }
+            return;
+        }
+
+        if self.last_search_query_area.contains(position) {
+            self.mode = SelectionMode::SearchQueryEditing;
         }
     }
 
@@ -557,13 +652,11 @@ impl App {
                     });
 
                 if let Some(path) = last_path {
-                    use base64::{Engine as _, engine::general_purpose::STANDARD};
-                    let encoded = STANDARD.encode(path.as_bytes());
-                    let osc52_seq = format!("\x1b]52;c;{}\x07", encoded);
-                    print!("{}", osc52_seq);
-                    let _ = std::io::stdout().flush();
-                    log::info!("Copied path to clipboard: {}", path);
-                    self.copied_indicator = Some((self.tree_state.selected().to_vec(), std::time::Instant::now()));
+                    self.copy_to_clipboard(&path);
+                    self.copied_indicator = Some((
+                        self.tree_state.selected().to_vec(),
+                        std::time::Instant::now(),
+                    ));
                 }
             }
             KeyCode::Char('g') => {
@@ -1113,7 +1206,72 @@ impl App {
         let hover_changed = self.hovered_node != new_hover;
         self.hovered_node = new_hover;
 
-        let needs_redraw = hover_changed;
+        let mut hovered_key = None;
+        if self.last_object_info_area.contains(position) {
+            let area = self.last_object_info_area;
+            let is_on_border = mouse.column == area.x
+                || mouse.column == area.x + area.width.saturating_sub(1)
+                || mouse.row == area.y
+                || mouse.row == area.y + area.height.saturating_sub(1);
+
+            if !is_on_border {
+                let selected = self.tree_state.selected().to_vec();
+                if !selected.is_empty() {
+                    if let Some((info, histogram_data)) = self.get_text_for(&selected) {
+                        let inner_area = area.inner(ratatui::layout::Margin::new(1, 1));
+                        let layout = if histogram_data.is_some() {
+                            ratatui::layout::Layout::vertical([
+                                ratatui::layout::Constraint::Percentage(30),
+                                ratatui::layout::Constraint::Percentage(70),
+                            ])
+                        } else {
+                            ratatui::layout::Layout::vertical([
+                                ratatui::layout::Constraint::Percentage(100),
+                                ratatui::layout::Constraint::Percentage(0),
+                            ])
+                        }
+                        .split(inner_area);
+
+                        let table_area = layout[0];
+                        if table_area.contains(position) {
+                            let clicked_row_idx = (mouse.row - table_area.y) as usize
+                                + self.object_info_scroll_state as usize;
+                            let key_col_width = 26;
+                            let data_col_width =
+                                std::cmp::max(area.width.saturating_sub(key_col_width + 3), 2);
+
+                            let mut current_row_idx = 0;
+                            for (k, v) in info {
+                                let num_subrows: usize = v
+                                    .split('\n')
+                                    .map(|line| {
+                                        let chars_len = line.chars().count();
+                                        if chars_len == 0 {
+                                            1
+                                        } else {
+                                            (chars_len + data_col_width as usize - 1)
+                                                / data_col_width as usize
+                                        }
+                                    })
+                                    .sum();
+
+                                if clicked_row_idx >= current_row_idx
+                                    && clicked_row_idx < current_row_idx + num_subrows
+                                {
+                                    hovered_key = Some(k.clone());
+                                    break;
+                                }
+                                current_row_idx += num_subrows;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        let obj_info_hover_changed = self.hovered_object_info_key != hovered_key;
+        self.hovered_object_info_key = hovered_key;
+
+        let needs_redraw = hover_changed || obj_info_hover_changed;
 
         let match_result = match mouse.kind {
             MouseEventKind::Down(MouseButton::Left) => {
