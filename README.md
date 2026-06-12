@@ -12,6 +12,7 @@ h5inspect is a modern, interactive terminal application designed to make explori
 ## Features
 - Keyboard navigation (arrow keys + vim bindings)
 - Mouse support
+- Double click to copy!
 - Fuzzy search
 - Data visualization
 - [Launch external analysis scripts](h5inspect_post/README.md)
