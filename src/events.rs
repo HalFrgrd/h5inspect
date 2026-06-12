@@ -9,6 +9,7 @@ use crate::tree::TreeNode;
 pub enum Event {
     Key(KeyEvent),
     Mouse(MouseEvent),
+    Paste(String),
     AnimationTick,
     Resize,
     TreeUpdate(TreeNode<NodeIdT>),
@@ -30,6 +31,7 @@ impl EventHandler {
             match event::read().unwrap() {
                 CrosstermEvent::Key(key) => Event::Key(key),
                 CrosstermEvent::Mouse(mouse) => Event::Mouse(mouse),
+                CrosstermEvent::Paste(text) => Event::Paste(text),
                 CrosstermEvent::Resize(_, _) => Event::Resize,
                 _ => Event::AnimationTick, // Ignore other events for now
             }

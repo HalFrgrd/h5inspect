@@ -85,6 +85,8 @@ pub struct App {
     pub is_dragging_divider: bool,
     last_redraw_from_scroll: Instant,
     pub hovered_node: Option<Vec<NodeIdT>>,
+    pub last_click_time: Option<Instant>,
+    pub last_clicked_node: Option<Vec<NodeIdT>>,
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -251,6 +253,8 @@ impl App {
             is_dragging_divider: false,
             last_redraw_from_scroll: Instant::now(),
             hovered_node: None,
+            last_click_time: None,
+            last_clicked_node: None,
         }
     }
 
@@ -417,8 +421,41 @@ impl App {
 
         if let Some(id) = self.tree_state.rendered_at(position) {
             let arg = id.to_vec();
-            self.tree_state.toggle(arg.clone());
-            self.tree_state.select(arg);
+
+            let is_double_click = if let (Some(last_id), Some(last_time)) = (&self.last_clicked_node, self.last_click_time) {
+                last_id == &arg && last_time.elapsed().as_millis() < 300
+            } else {
+                false
+            };
+
+            self.last_clicked_node = Some(arg.clone());
+            self.last_click_time = Some(std::time::Instant::now());
+
+            if is_double_click {
+                // Double click: copy path to clipboard using OSC 52
+                let path_str = self
+                    .tree
+                    .as_ref()
+                    .and_then(|tree| tree.get_selected_node(&arg))
+                    .and_then(|node| match &node.hdf5_object {
+                        Some(Hdf5Object::Dataset(dataset)) => Some(dataset.name().to_string()),
+                        Some(Hdf5Object::Group(group)) => Some(group.name().to_string()),
+                        _ => None,
+                    });
+
+                if let Some(path) = path_str {
+                    use base64::{Engine as _, engine::general_purpose::STANDARD};
+                    let encoded = STANDARD.encode(path.as_bytes());
+                    let osc52_seq = format!("\x1b]52;c;{}\x07", encoded);
+                    print!("{}", osc52_seq);
+                    let _ = std::io::stdout().flush();
+                    log::info!("Copied path to clipboard: {}", path);
+                }
+            } else {
+                // Single click: toggle and select
+                self.tree_state.toggle(arg.clone());
+                self.tree_state.select(arg);
+            }
         }
     }
 
@@ -504,6 +541,26 @@ impl App {
             }
             KeyCode::Char('f') => {
                 self.open_all_tree_nodes();
+            }
+            KeyCode::Char('y') => {
+                let last_path = self
+                    .tree
+                    .as_ref()
+                    .and_then(|tree| tree.get_selected_node(self.tree_state.selected()))
+                    .and_then(|node| match &node.hdf5_object {
+                        Some(Hdf5Object::Dataset(dataset)) => Some(dataset.name().to_string()),
+                        Some(Hdf5Object::Group(group)) => Some(group.name().to_string()),
+                        _ => None,
+                    });
+
+                if let Some(path) = last_path {
+                    use base64::{Engine as _, engine::general_purpose::STANDARD};
+                    let encoded = STANDARD.encode(path.as_bytes());
+                    let osc52_seq = format!("\x1b]52;c;{}\x07", encoded);
+                    print!("{}", osc52_seq);
+                    let _ = std::io::stdout().flush();
+                    log::info!("Copied path to clipboard: {}", path);
+                }
             }
             KeyCode::Char('g') => {
                 if self.filtered_tree.is_some() {
@@ -867,7 +924,11 @@ impl App {
 
         let mut redraw = true;
         let mut terminal = ratatui::init();
-        crossterm::execute!(std::io::stdout(), crossterm::event::EnableMouseCapture)?;
+        crossterm::execute!(
+            std::io::stdout(),
+            crossterm::event::EnableMouseCapture,
+            crossterm::event::EnableBracketedPaste
+        )?;
 
         while self.running == AppFinishingState::Continue {
             if let Some(last_selected) = &self.tree_state_last_rendered_selected {
@@ -904,7 +965,8 @@ impl App {
                             // Pause the TUI: disable raw mode and leave alternate screen
                             crossterm::execute!(
                                 std::io::stdout(),
-                                crossterm::event::DisableMouseCapture
+                                crossterm::event::DisableMouseCapture,
+                                crossterm::event::DisableBracketedPaste
                             )?;
                             ratatui::restore();
 
@@ -951,7 +1013,8 @@ impl App {
                             terminal = ratatui::init();
                             crossterm::execute!(
                                 std::io::stdout(),
-                                crossterm::event::EnableMouseCapture
+                                crossterm::event::EnableMouseCapture,
+                                crossterm::event::EnableBracketedPaste
                             )?;
 
                             true
@@ -959,6 +1022,7 @@ impl App {
                     }
                 }
                 events::Event::Mouse(mouse) => self.handle_mouse(mouse),
+                events::Event::Paste(text) => self.handle_paste(text),
                 events::Event::Resize => true,
                 events::Event::TreeUpdate(tree) => {
                     self.tree = Some(tree);
@@ -969,7 +1033,11 @@ impl App {
             }
         }
 
-        crossterm::execute!(std::io::stdout(), crossterm::event::DisableMouseCapture)?;
+        crossterm::execute!(
+            std::io::stdout(),
+            crossterm::event::DisableMouseCapture,
+            crossterm::event::DisableBracketedPaste
+        )?;
         ratatui::restore();
         Ok(self.running)
     }
@@ -1120,6 +1188,20 @@ impl App {
         };
 
         needs_redraw || match_result
+    }
+
+    fn handle_paste(&mut self, text: String) -> bool {
+        if self.mode == SelectionMode::SearchQueryEditing {
+            for c in text.chars() {
+                if !c.is_control() {
+                    self.search_query_left.push(c);
+                }
+            }
+            self.update_filtered_tree();
+            true
+        } else {
+            false
+        }
     }
 }
 

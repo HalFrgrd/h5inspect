@@ -530,6 +530,10 @@ fn render_help_screen(frame: &mut Frame, app: &mut App, area: Rect) {
                 Span::from("q/Ctrl+c").style(KEY_BINDING_STYLE),
             ]),
             Line::from(vec![
+                Span::from("Yank (copy) node path:                  ").style(DEFAULT_TEXT_STYLE),
+                Span::from("y/double-click").style(KEY_BINDING_STYLE),
+            ]),
+            Line::from(vec![
                 Span::from("Run ").style(DEFAULT_TEXT_STYLE),
                 Span::from("$H5INSPECT_POST").style(
                     Style::new()
