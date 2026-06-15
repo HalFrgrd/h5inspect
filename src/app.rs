@@ -1277,7 +1277,11 @@ impl App {
             _ => false,
         };
 
-        needs_redraw || match_result
+        if matches!(mouse.kind, MouseEventKind::Moved | MouseEventKind::Drag(_)) {
+            false
+        } else {
+            needs_redraw || match_result
+        }
     }
 
     fn handle_paste(&mut self, text: String) -> bool {
