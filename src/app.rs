@@ -47,7 +47,7 @@ enum AsyncDataAnalysis {
 
 pub type NodeIdT = hdf5_metno_sys::h5i::hid_t;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub enum AppFinishingState {
     Continue,
     Quit,
@@ -57,6 +57,25 @@ pub enum KeyPressResult {
     Redraw,
     DontRedraw,
     RunPostCommand(Option<String>, String),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PointerShape {
+    Default,
+    Text,
+    Pointer,
+    ColResize,
+}
+
+impl PointerShape {
+    fn to_str(&self) -> &'static str {
+        match self {
+            PointerShape::Default => "default",
+            PointerShape::Text => "text",
+            PointerShape::Pointer => "pointer",
+            PointerShape::ColResize => "col-resize",
+        }
+    }
 }
 
 pub struct App {
@@ -92,6 +111,7 @@ pub struct App {
     pub copied_indicator: Option<(Vec<NodeIdT>, std::time::Instant)>,
     pub copied_object_info_indicator: Option<(String, std::time::Instant)>,
     pub hovered_object_info_key: Option<String>,
+    current_pointer_shape: PointerShape,
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -265,6 +285,7 @@ impl App {
             copied_indicator: None,
             copied_object_info_indicator: None,
             hovered_object_info_key: None,
+            current_pointer_shape: PointerShape::Default,
         }
     }
 
@@ -1166,6 +1187,19 @@ impl App {
         KeyPressResult::DontRedraw
     }
 
+    fn set_pointer_shape(&mut self, shape: PointerShape) {
+        if self.current_pointer_shape == shape {
+            return;
+        }
+        self.current_pointer_shape = shape;
+        let mut stdout = std::io::stdout();
+        let _ = std::io::Write::write_all(
+            &mut stdout,
+            format!("\x1b]22;{}\x1b\\", shape.to_str()).as_bytes(),
+        );
+        let _ = std::io::Write::flush(&mut stdout);
+    }
+
     fn handle_mouse(&mut self, mouse: crossterm::event::MouseEvent) -> bool {
         log::debug!("mouse event: {:?}", mouse);
 
@@ -1200,6 +1234,27 @@ impl App {
         self.hovered_object_info_key = hovered_key;
 
         let needs_redraw = hover_changed || obj_info_hover_changed;
+
+        let shape = if self.mode == SelectionMode::HelpScreen {
+            PointerShape::Default
+        } else {
+            let divider_column = self.last_tree_area.right();
+            let is_over_divider = (mouse.column == divider_column
+                || mouse.column == divider_column.saturating_sub(1))
+                && mouse.row >= self.last_tree_area.y
+                && mouse.row < self.last_tree_area.y + self.last_tree_area.height;
+
+            if self.is_dragging_divider || is_over_divider {
+                PointerShape::ColResize
+            } else if self.last_search_query_area.contains(position) {
+                PointerShape::Text
+            } else if self.hovered_node.is_some() || self.hovered_object_info_key.is_some() {
+                PointerShape::Pointer
+            } else {
+                PointerShape::Default
+            }
+        };
+        self.set_pointer_shape(shape);
 
         let match_result = match mouse.kind {
             MouseEventKind::Down(MouseButton::Left) => {
@@ -1356,14 +1411,39 @@ mod tests {
         use crossterm::event::MouseEvent;
         let mut app = App::new(PathBuf::from("dummy.h5"));
 
+        // Setup test layout areas
+        app.last_search_query_area = ratatui::layout::Rect::new(0, 10, 20, 3);
+        app.last_tree_area = ratatui::layout::Rect::new(0, 0, 15, 10);
+
         // MouseMoved event should not trigger redraw
         let move_event = MouseEvent {
             kind: MouseEventKind::Moved,
-            column: 10,
-            row: 10,
+            column: 17, // Not over any specific element
+            row: 5,
             modifiers: crossterm::event::KeyModifiers::empty(),
         };
         assert!(!app.handle_mouse(move_event));
+        assert_eq!(app.current_pointer_shape, PointerShape::Default);
+
+        // Hover over search box -> Text pointer
+        let move_over_search = MouseEvent {
+            kind: MouseEventKind::Moved,
+            column: 5,
+            row: 11, // inside last_search_query_area
+            modifiers: crossterm::event::KeyModifiers::empty(),
+        };
+        app.handle_mouse(move_over_search);
+        assert_eq!(app.current_pointer_shape, PointerShape::Text);
+
+        // Hover over divider -> ColResize pointer
+        let move_over_divider = MouseEvent {
+            kind: MouseEventKind::Moved,
+            column: 15, // right edge of last_tree_area
+            row: 5,
+            modifiers: crossterm::event::KeyModifiers::empty(),
+        };
+        app.handle_mouse(move_over_divider);
+        assert_eq!(app.current_pointer_shape, PointerShape::ColResize);
 
         // MouseDrag event should not trigger redraw
         let drag_event = MouseEvent {
@@ -1382,5 +1462,13 @@ mod tests {
             modifiers: crossterm::event::KeyModifiers::empty(),
         };
         assert!(app.handle_mouse(down_event));
+    }
+}
+
+impl Drop for App {
+    fn drop(&mut self) {
+        let mut stdout = std::io::stdout();
+        let _ = std::io::Write::write_all(&mut stdout, b"\x1b]22;\x1b\\");
+        let _ = std::io::Write::flush(&mut stdout);
     }
 }
