@@ -13,9 +13,8 @@ mod num_utils;
 mod tree;
 mod ui;
 
-fn main() -> Result<(), Box<dyn Error>> {
-    // crate::h5_utils::generate_dummy_file()?;
-    let matches = clap::Command::new("h5inspect")
+fn build_cli() -> clap::Command {
+    clap::Command::new("h5inspect")
         .author("Hal Frigaard")
         .about("Simple TUI to inspect h5 files")
         .color(clap::ColorChoice::Auto)
@@ -52,7 +51,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .value_name("FILE")
                 .help("Name of hdf5 file to inspect")
                 .value_hint(clap::ValueHint::FilePath)
-                .required_unless_present("generate-dummy-file"),
+                .required_unless_present_any(["generate-dummy-file", "generate-completion"]),
         )
         .arg(
             clap::Arg::new("logs")
@@ -68,10 +67,27 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .help("Generate a dummy hdf5 file for testing purposes")
                 .action(clap::ArgAction::SetTrue),
         )
+        .arg(
+            clap::Arg::new("generate-completion")
+                .long("generate-completion")
+                .value_name("SHELL")
+                .help("Generate shell completion script")
+                .value_parser(clap::value_parser!(clap_complete::Shell)),
+        )
         .version(env!("CARGO_PKG_VERSION"))
-        .get_matches();
+}
 
-    // Handle generate-dummy-file flag first (doesn't require h5file)
+fn main() -> Result<(), Box<dyn Error>> {
+    let matches = build_cli().get_matches();
+
+    // Handle generate-completion first (doesn't require h5file)
+    if let Some(shell) = matches.get_one::<clap_complete::Shell>("generate-completion") {
+        let mut cmd = build_cli();
+        clap_complete::generate(*shell, &mut cmd, "h5inspect", &mut std::io::stdout());
+        return Ok(());
+    }
+
+    // Handle generate-dummy-file flag next (doesn't require h5file)
     if matches.get_flag("generate-dummy-file") {
         h5_utils::generate_dummy_file()?;
         return Ok(());

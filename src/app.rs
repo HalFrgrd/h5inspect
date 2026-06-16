@@ -1350,4 +1350,37 @@ mod tests {
             Err(e) => std::panic!("Fork failed: {}", e),
         }
     }
+
+    #[test]
+    fn test_handle_mouse_redraw_behavior() {
+        use crossterm::event::MouseEvent;
+        let mut app = App::new(PathBuf::from("dummy.h5"));
+
+        // MouseMoved event should not trigger redraw
+        let move_event = MouseEvent {
+            kind: MouseEventKind::Moved,
+            column: 10,
+            row: 10,
+            modifiers: crossterm::event::KeyModifiers::empty(),
+        };
+        assert!(!app.handle_mouse(move_event));
+
+        // MouseDrag event should not trigger redraw
+        let drag_event = MouseEvent {
+            kind: MouseEventKind::Drag(MouseButton::Left),
+            column: 10,
+            row: 10,
+            modifiers: crossterm::event::KeyModifiers::empty(),
+        };
+        assert!(!app.handle_mouse(drag_event));
+
+        // MouseDown event (click) should trigger redraw
+        let down_event = MouseEvent {
+            kind: MouseEventKind::Down(MouseButton::Left),
+            column: 10,
+            row: 10,
+            modifiers: crossterm::event::KeyModifiers::empty(),
+        };
+        assert!(app.handle_mouse(down_event));
+    }
 }
